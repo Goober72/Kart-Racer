@@ -102,7 +102,7 @@ func rebuild_track(data: Dictionary) -> void:
 func respawn_kart(k: Kart) -> void:
 	var t: Transform3D
 	if track.length <= 0.0:
-		t = Transform3D(Basis.IDENTITY, Vector3(0, 1, 0))
+		t = Transform3D(Basis.IDENTITY, track.spawn_point())
 	else:
 		t = track.transform_at(fposmod(k.distance, track.length), 0.0, 1.0)
 	k.respawn(t)
@@ -189,7 +189,7 @@ func _spawn_karts() -> void:
 
 func _spawn_transform(index: int) -> Transform3D:
 	if track.length <= 0.0:
-		return Transform3D(Basis.IDENTITY, Vector3(index * 4.0, 1.0, 0.0))
+		return Transform3D(Basis.IDENTITY, track.spawn_point() + Vector3(index * 4.0, 0.0, 0.0))
 	return track.grid_transform(index)
 
 

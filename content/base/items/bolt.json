@@ -1,0 +1,23 @@
+{
+  "id": "bolt",
+  "name": "Bolt",
+  "label": "B",
+  "color": "#ff4433",
+  "description": "Fires straight along the track.",
+  "weights": [
+    4,
+    4,
+    2
+  ],
+  "effects": [
+    {
+      "type": "throw",
+      "homing": false,
+      "color": "#ff4433",
+      "hit": {
+        "spin": 0.9,
+        "slow": 0.4
+      }
+    }
+  ]
+}

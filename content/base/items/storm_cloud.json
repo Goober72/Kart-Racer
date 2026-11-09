@@ -1,0 +1,22 @@
+{
+  "id": "storm_cloud",
+  "name": "Storm Cloud",
+  "label": "Z",
+  "color": "#f2e14e",
+  "description": "Zaps every racer ahead of you.",
+  "weights": [
+    0,
+    1,
+    3
+  ],
+  "effects": [
+    {
+      "type": "zap",
+      "target": "ahead",
+      "hit": {
+        "slow": 0.5,
+        "spin": 0.6
+      }
+    }
+  ]
+}

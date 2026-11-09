@@ -1,0 +1,23 @@
+{
+  "id": "oil_slick",
+  "name": "Oil Slick",
+  "label": "O",
+  "color": "#3a3a46",
+  "description": "Drop a slippery puddle behind you.",
+  "weights": [
+    6,
+    4,
+    1
+  ],
+  "effects": [
+    {
+      "type": "drop",
+      "shape": "puddle",
+      "radius": 2.3,
+      "hit": {
+        "spin": 0.9,
+        "slow": 0.4
+      }
+    }
+  ]
+}

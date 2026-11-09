@@ -1,0 +1,24 @@
+{
+  "id": "jelly_puddle",
+  "name": "Jelly Puddle",
+  "label": "J",
+  "color": "#ff7fbf",
+  "description": "Example mod item made only from JSON: a bouncy pink trap.",
+  "weights": [
+    4,
+    3,
+    1
+  ],
+  "effects": [
+    {
+      "type": "drop",
+      "shape": "puddle",
+      "color": "#ff7fbf",
+      "radius": 2.6,
+      "hit": {
+        "slow": 0.3,
+        "bounce": 9
+      }
+    }
+  ]
+}

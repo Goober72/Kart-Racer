@@ -1,0 +1,19 @@
+{
+  "id": "spring",
+  "name": "Spring",
+  "label": "^",
+  "color": "#7fd16b",
+  "description": "A big jump. Hop over traps or cut a corner.",
+  "weights": [
+    3,
+    3,
+    2
+  ],
+  "effects": [
+    {
+      "type": "hop",
+      "height": 14,
+      "push": 6
+    }
+  ]
+}

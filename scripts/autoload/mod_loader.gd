@@ -1,5 +1,5 @@
 extends Node
-## Finds and loads all game content: racers and tracks.
+## Finds and loads all game content: racers, tracks and items.
 ##
 ## The base game is itself loaded like a mod (from res://content/base), so
 ## anything the base game can do, a mod can do too. Mods load after the base
@@ -34,6 +34,20 @@ const RACER_DEFAULTS := {
 	"model": "",
 	"model_scale": 1.0,
 	"model_rotation_y": 0.0,
+	## {"file": "models/me.glb", "scale": 1, "rotation_y": 0, "offset": [0,0,0], "animations": {...}}
+	"character_model": {},
+	## {"file": "models/kart.glb", "scale": 1, "rotation_y": 0, "seat": [0,0.55,0], "wheels": [...], "front_wheels": [...]}
+	"kart_model": {},
+}
+
+const ITEM_DEFAULTS := {
+	"name": "Item",
+	"description": "",
+	"label": "?",
+	"color": "#ffcc33",
+	"uses": 1,
+	"weights": [1, 1, 1],
+	"effects": [],
 }
 
 const TRACK_DEFAULTS := {
@@ -58,11 +72,21 @@ const TRACK_DEFAULTS := {
 	"dev_only": false,
 	"model": "",
 	"model_collision": false,
+	"model_scale": 1.0,
+	## Generated parts of the track. Turn these off when a model provides them.
+	"road": true,
+	"walls": true,
+	"ground": true,
+	"start_gantry": true,
+	## Item box rows: positions around the lap (0..1). Each row spans the road.
+	"item_rows": [0.22, 0.62],
+	"items_per_row": 4,
 	"sun_angle": 50.0,
 }
 
 var racers: Dictionary = {}
 var tracks: Dictionary = {}
+var items: Dictionary = {}
 ## One entry per loaded mod: {id, name, version, author, description, dir, is_base, racers, tracks}
 var loaded_mods: Array[Dictionary] = []
 ## Messages produced while loading: {level: "info"|"warn"|"error", text: String}
@@ -76,6 +100,9 @@ func _ready() -> void:
 func reload() -> void:
 	racers.clear()
 	tracks.clear()
+	items.clear()
+	Effects.clear_cache()
+	ModelLoader.clear_cache()
 	loaded_mods.clear()
 	messages.clear()
 
@@ -121,7 +148,7 @@ func reload() -> void:
 	for manifest in manifests:
 		_load_mod(manifest["_dir"], manifest, false)
 
-	_info("Loaded %d racer(s) and %d track(s) from %d source(s)." % [racers.size(), tracks.size(), loaded_mods.size()])
+	_info("Loaded %d racer(s), %d track(s) and %d item(s) from %d source(s)." % [racers.size(), tracks.size(), items.size(), loaded_mods.size()])
 	reloaded.emit()
 
 
@@ -189,6 +216,7 @@ func _load_mod(dir: String, manifest: Dictionary, is_base: bool) -> void:
 		"is_base": is_base,
 		"racers": 0,
 		"tracks": 0,
+		"items": 0,
 	}
 
 	for file in _json_files(dir.path_join("racers")):
@@ -223,9 +251,25 @@ func _load_mod(dir: String, manifest: Dictionary, is_base: bool) -> void:
 		tracks[track["id"]] = track
 		mod["tracks"] += 1
 
+	for file in _json_files(dir.path_join("items")):
+		var data = _read_json(file)
+		if not data is Dictionary:
+			continue
+		var problem := _check_item(data)
+		if problem != "":
+			_error("%s: %s" % [_short(file), problem])
+			continue
+		var item := _merge(ITEM_DEFAULTS, data)
+		item["_mod"] = mod["id"]
+		item["_dir"] = dir
+		if items.has(item["id"]):
+			_info("Mod '%s' replaces item '%s'." % [mod["id"], item["id"]])
+		items[item["id"]] = item
+		mod["items"] += 1
+
 	loaded_mods.append(mod)
 	if not is_base:
-		_info("Loaded mod '%s' v%s (%d racers, %d tracks)." % [mod["name"], mod["version"], mod["racers"], mod["tracks"]])
+		_info("Loaded mod '%s' v%s (%d racers, %d tracks, %d items)." % [mod["name"], mod["version"], mod["racers"], mod["tracks"], mod["items"]])
 
 
 func _check_racer(data: Dictionary) -> String:
@@ -241,6 +285,14 @@ func _check_racer(data: Dictionary) -> String:
 	return ""
 
 
+func _check_item(data: Dictionary) -> String:
+	if not data.has("id") or str(data["id"]).strip_edges() == "":
+		return "item is missing an \"id\"."
+	if not data.get("effects", []) is Array or data.get("effects", []).is_empty():
+		return "item needs an \"effects\" list, like [{\"type\": \"boost\"}]."
+	return ""
+
+
 func _check_track(data: Dictionary) -> String:
 	if not data.has("id") or str(data["id"]).strip_edges() == "":
 		return "track is missing an \"id\"."
@@ -248,8 +300,9 @@ func _check_track(data: Dictionary) -> String:
 	var points = data.get("points", [])
 	if not points is Array:
 		return "\"points\" must be a list like [[0,0,0], [50,0,0], ...]."
-	if not free_roam and points.size() < 4:
-		return "a track needs at least 4 points (it has %d)." % points.size()
+	var has_model := str(data.get("model", "")) != ""
+	if not free_roam and not has_model and points.size() < 4:
+		return "a track needs at least 4 points (it has %d), or a model with Path markers." % points.size()
 	for i in points.size():
 		var p = points[i]
 		if not p is Array or p.size() < 3:

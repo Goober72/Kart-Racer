@@ -61,7 +61,15 @@ func _ready() -> void:
 	var start := UIKit.button("RACE!", _start, 30)
 	left.add_child(start)
 	if BuildInfo.is_dev:
-		left.add_child(UIKit.button("Create a Racer", _open_creator, 24))
+		var make_row := HBoxContainer.new()
+		make_row.add_theme_constant_override("separation", 12)
+		left.add_child(make_row)
+		var create := UIKit.button("Create a Racer", _open_creator, 22)
+		create.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		make_row.add_child(create)
+		var import_track := UIKit.button("Import Track Model", _import_track, 22)
+		import_track.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		make_row.add_child(import_track)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
 	left.add_child(row)
@@ -241,6 +249,63 @@ func _start() -> void:
 	GameState.start_race()
 
 
+func _import_track() -> void:
+	var picker := FilePicker.new()
+	add_child(picker)
+	picker.picked.connect(func(file_name: String, bytes: PackedByteArray):
+		picker.queue_free()
+		_create_track_from_model(file_name, bytes))
+	picker.open(PackedStringArray(["*.glb"]))
+
+
+func _create_track_from_model(file_name: String, bytes: PackedByteArray) -> void:
+	_mods_panel.visible = true
+	if not file_name.to_lower().ends_with(".glb"):
+		_mods_text.text = "[color=#ff6060]Please pick a .glb file (Blender: File > Export > glTF 2.0, format glTF Binary).[/color]"
+		return
+	var problem := ModelLoader.validate_bytes(bytes)
+	if problem != "":
+		_mods_text.text = "[color=#ff6060]%s[/color]" % problem
+		return
+	var title := file_name.get_basename().replace("_", " ").replace("-", " ").strip_edges().capitalize()
+	var id := "my_" + title.to_snake_case().validate_filename().replace(" ", "_")
+	var mod_dir := ModLoader.user_mods_dir().path_join("my_tracks")
+	DirAccess.make_dir_recursive_absolute(mod_dir.path_join("models"))
+	DirAccess.make_dir_recursive_absolute(mod_dir.path_join("tracks"))
+	if not FileAccess.file_exists(mod_dir.path_join("mod.json")):
+		var mf := FileAccess.open(mod_dir.path_join("mod.json"), FileAccess.WRITE)
+		mf.store_string(JSON.stringify({"id": "my_tracks", "name": "My Tracks", "version": "1.0"}, "  "))
+		mf.close()
+	var f := FileAccess.open(mod_dir.path_join("models").path_join(id + ".glb"), FileAccess.WRITE)
+	f.store_buffer(bytes)
+	f.close()
+	var track := {
+		"id": id,
+		"name": title,
+		"description": "Imported track model.",
+		"model": "models/%s.glb" % id,
+		"model_collision": true,
+		"road": false,
+		"ground": false,
+		"tree_count": 0,
+		"width": 14,
+		"points": [],
+	}
+	var tf := FileAccess.open(mod_dir.path_join("tracks").path_join(id + ".json"), FileAccess.WRITE)
+	tf.store_string(JSON.stringify(track, "  "))
+	tf.close()
+	ModLoader.reload()
+	if not ModLoader.tracks.has(id):
+		_update_mods_text()
+		return
+	GameState.track_id = id
+	GameState.ai_count = 0
+	GameState.track_override = {}
+	# If the model has Path_ markers it's ready to race; otherwise record a route.
+	DevTools.pending_record_track = id
+	GameState.start_race()
+
+
 func _open_creator() -> void:
 	var creator := RacerCreator.new()
 	add_child(creator)
@@ -248,7 +313,6 @@ func _open_creator() -> void:
 
 
 func _reload_mods() -> void:
-	AbilityFactory.clear_cache()
 	ModLoader.reload()
 	_mods_panel.visible = true
 
@@ -266,7 +330,7 @@ func _update_mods_text() -> void:
 	for m in ModLoader.loaded_mods:
 		var label := "Base game" if m["is_base"] else "%s v%s" % [m["name"], m["version"]]
 		var by := "" if str(m["author"]) == "" else " by " + str(m["author"])
-		lines.append("  - %s%s  (%d racers, %d tracks)" % [label, by, m["racers"], m["tracks"]])
+		lines.append("  - %s%s  (%d racers, %d tracks, %d items)" % [label, by, m["racers"], m["tracks"], m["items"]])
 	lines.append("")
 	lines.append("[b]Mod folders[/b]")
 	for root in ModLoader.get_mod_roots():

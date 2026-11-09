@@ -1,0 +1,18 @@
+{
+  "id": "bubble_shield",
+  "name": "Bubble Shield",
+  "label": "S",
+  "color": "#3ac0e0",
+  "description": "Blocks hits for a while.",
+  "weights": [
+    3,
+    3,
+    2
+  ],
+  "effects": [
+    {
+      "type": "shield",
+      "duration": 5
+    }
+  ]
+}

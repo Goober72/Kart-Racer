@@ -1,0 +1,34 @@
+{
+  "id": "rivet",
+  "name": "Rivet",
+  "description": "Example mod racer using imported models: an animated robot driver in a rocket kart.",
+  "stats": { "max_speed": 31, "acceleration": 17, "handling": 2.4, "drift": 1.0 },
+  "character_model": {
+    "file": "models/robot.glb",
+    "scale": 1.0,
+    "rotation_y": 0,
+    "animations": {
+      "idle": "Idle",
+      "drive": "Drive",
+      "steer_left": "LeanLeft",
+      "steer_right": "LeanRight",
+      "skill": "Special",
+      "hit": "Hit",
+      "win": "Cheer"
+    }
+  },
+  "kart_model": {
+    "file": "models/rocket_kart.glb",
+    "scale": 1.0,
+    "rotation_y": 0,
+    "seat": [0, 0.6, 0.1]
+  },
+  "ability": {
+    "name": "Rocket Bolt",
+    "cooldown": 7,
+    "charged_cooldown": 12,
+    "tap":     { "name": "Rocket Bolt", "effects": [ { "type": "throw", "color": "#ffcc33" } ] },
+    "charged": { "name": "Rocket Ride", "effects": [ { "type": "boost", "duration": 2.0, "power": 1.5 },
+                                                      { "type": "throw", "homing": true, "count": 2, "color": "#ffcc33" } ] }
+  }
+}

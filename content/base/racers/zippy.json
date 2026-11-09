@@ -6,6 +6,40 @@
   "accent_color": "#1d1d24",
   "helmet_color": "#e8e8e8",
   "driver_color": "#f2c38f",
-  "stats": { "max_speed": 28.5, "acceleration": 22, "handling": 2.9, "drift": 1.2 },
-  "ability": { "type": "hop", "name": "Spring Heels", "height": 13, "push": 6, "cooldown": 6 }
+  "stats": {
+    "max_speed": 28.5,
+    "acceleration": 22,
+    "handling": 2.9,
+    "drift": 1.2
+  },
+  "ability": {
+    "name": "Spring Heels",
+    "cooldown": 5.5,
+    "charged_cooldown": 9,
+    "tap": {
+      "name": "Spring Heels",
+      "effects": [
+        {
+          "type": "hop",
+          "height": 11,
+          "push": 4
+        }
+      ]
+    },
+    "charged": {
+      "name": "Moon Bounce",
+      "effects": [
+        {
+          "type": "hop",
+          "height": 17,
+          "push": 10
+        },
+        {
+          "type": "boost",
+          "duration": 1.2,
+          "power": 1.35
+        }
+      ]
+    }
+  }
 }

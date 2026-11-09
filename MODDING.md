@@ -1,7 +1,10 @@
 # Modding Guide
 
-Mods can add or replace **racers** (character + kart) and **tracks**. Racers can
-have **scripted abilities** written in GDScript. Use the **Dev build** while
+Mods can add or replace **racers** (character + kart, optionally 3D models with
+animations), **tracks** (a list of points, or a 3D model) and **items**. Every
+racer has a **skill** with a quick (tap) and charged (hold) version. Skills and
+items are built from the same **effects**, and you can write new effects or
+whole skills in GDScript. Use the **Dev build** while
 making mods: it shows errors with file names and line numbers, and you can
 reload mods without restarting (F9 or the `reload` command).
 
@@ -13,9 +16,13 @@ spread across four stats (1–5 each) and ability power (1–3), so every racer
 stays fair. **Save** adds them to the racer list, **Save + Test Drive** starts a
 quick race, and **Share file** gives you the `.json` file to send to friends.
 
+You can also **import a character model and a kart model** (.glb) here, even
+on a phone: use Size/Turn until it faces away from the camera, Seat height to
+sit the character in the kart, and **Test animations** to check them.
+
 Created racers are saved as a normal mod called `my_racers` in your user mods
-folder (see below), so you can open the file and keep editing it by hand. For
-example, you can add a custom `model` or a scripted ability.
+folder (see below), so you can open the file and keep editing it by hand, for
+example to write a fully custom skill.
 
 ## Where mods go
 
@@ -38,10 +45,14 @@ mods/
       speedy.json
     tracks/
       lava_loop.json
-    scripts/            (optional, for scripted abilities)
-      my_ability.gd
-    models/             (optional, .glb / .gltf files)
+    items/
+      banana_peel.json
+    scripts/            (optional, for scripted skills/effects)
+      my_skill.gd
+    models/             (optional, .glb files)
       speedy.glb
+      speedy_kart.glb
+      lava_loop.glb
 ```
 
 ### mod.json
@@ -95,46 +106,142 @@ mods/
 
 Anything you leave out uses a default.
 
-### Built-in abilities
-| `type` | Parameters |
-|---|---|
-| `boost` | `duration`, `power` (speed multiplier), `cooldown` |
-| `hop` | `height`, `push`, `cooldown` |
-| `shockwave` | `radius`, `slow` (0–1), `cooldown` |
-| `shield` | `duration`, `cooldown` |
-| `none` | no ability |
-| `script` | `script`: path to your .gd file, plus any parameters you want |
+## Skills
 
-All abilities accept `name` (shown on the HUD) and `cooldown` (seconds).
+Every racer has one skill with two versions:
+- **Tap** the skill button: the quick version, short cooldown (`cooldown`).
+- **Hold** it for 1 second: the charged version, longer cooldown (`charged_cooldown`).
 
-### Scripted abilities
+A skill is a list of **effects** for each version:
 ```json
-"ability": { "type": "script", "script": "scripts/my_ability.gd", "name": "Magnet", "strength": 3 }
+"ability": {
+  "name": "Root Quake",
+  "cooldown": 8,
+  "charged_cooldown": 13,
+  "tap":     { "name": "Tremor",     "effects": [ { "type": "shockwave", "radius": 11 } ] },
+  "charged": { "name": "Root Quake", "effects": [
+      { "type": "shockwave", "radius": 18, "hit": { "spin": 0.8, "slow": 0.55 } },
+      { "type": "drop", "shape": "vines", "single_use": false, "lifetime": 12 } ] }
+}
 ```
+Each base racer has its own skill, so look at `content/base/racers/` for more examples.
+
+**Presets** save typing (the racer creator uses these):
+`{"type": "boost" | "hop" | "shockwave" | "shield" | "oil" | "bolt" | "storm" | "cloud", "level": 1-3, "name": "My Skill"}`.
+
+### Effects
+
+Skills and items both use these. All numbers are optional.
+
+| `type` | What it does | Options |
+|---|---|---|
+| `boost` | Speed up | `duration`, `power` (1.35 = 35% faster) |
+| `hop` | Jump | `height`, `push` (extra speed) |
+| `shield` | Block hits, soften wall bumps | `duration` |
+| `shockwave` | Hit everyone nearby | `radius`, `color`, `hit` |
+| `drop` | Leave a trap behind you | `shape` (`puddle`, `spikes`, `cloud`, `vines`, `box`), `radius`, `lifetime`, `count`, `spread`, `single_use`, `color`, `hit` |
+| `throw` | Fire a projectile | `homing` (chase the racer ahead), `count`, `speed`, `size`, `color`, `lifetime`, `hit` |
+| `zap` | Strike racers anywhere | `target` (`next`, `ahead`, `leader`, `all`), `color`, `hit` |
+| `script` | Run your own GDScript | `script` (path), plus anything your script reads |
+
+`hit` says what happens to whoever gets hit: `{"spin": seconds, "slow": 0-1, "bounce": upward speed}`.
+Shields block hits.
+
+### Scripted effects and skills
+A custom effect, usable from any skill or item:
+```json
+{ "type": "script", "script": "scripts/warp_effect.gd", "distance": 35 }
+```
+```gdscript
+extends KartEffect
+
+func apply(user: Kart, params: Dictionary) -> void:
+    user.add_boost(1.0, 1.2)
+```
+A fully custom skill: `"ability": {"type": "script", "script": "scripts/my_skill.gd", ...}`:
 ```gdscript
 extends KartAbility
 
-func activate() -> void:
-    # params holds everything from the "ability" object
-    var strength := float(params.get("strength", 1.0))
-    kart.add_boost(1.0, 1.2 + 0.1 * strength)
-
-func on_tick(delta: float) -> void:
-    pass  # runs every physics frame
+func activate(charged: bool) -> void:
+    var power := 1.6 if charged else 1.3
+    kart.add_boost(1.0, power)
 ```
-Useful things on `kart`: `speed`, `max_speed`, `place`, `velocity`,
+Useful things on a `Kart`: `speed`, `max_speed`, `place`, `velocity`, `item`,
 `add_boost(seconds, power)`, `spin(seconds)`, `flash(color, radius)`,
-`shield_time`, `global_position`. `get_other_karts()` returns every other kart.
-See `mods/example_mod/scripts/comeback_boost.gd` for a working example.
+`shield_time`, `global_position`, `give_item(data)`. Helpers:
+`Effects.apply(kart, {...})`, `Effects.hit(kart, {...})`, `Effects.others(kart)`,
+`Effects.race_of(kart)` (has `.track` and `.karts`). See
+`mods/example_mod/scripts/` for working examples.
 
 > ⚠️ Script mods run real code on your computer. Only install mods from people you trust.
 
-### Custom kart/character models
-Set `"model": "models/speedy.glb"` to replace the default kart with your own
-3D model. Make models in Blender (free) and export as **glTF 2.0 (.glb)**.
-The kart faces **-Z** (Blender's -Y forward / "Forward: -Z" in the exporter),
-1 unit = 1 meter, wheels resting at height 0. A normal kart is about 1.5 m wide
-and 2.4 m long. Use `model_scale` and `model_rotation_y` to fix size or direction.
+## Items
+
+`items/<anything>.json`:
+```json
+{
+  "id": "banana_peel",
+  "name": "Peel",
+  "label": "P",
+  "color": "#f2e14e",
+  "description": "Drop it behind you.",
+  "uses": 1,
+  "weights": [5, 3, 1],
+  "effects": [ { "type": "drop", "shape": "puddle", "color": "#f2e14e", "hit": { "spin": 1.0 } } ]
+}
+```
+- `label` and `color` make the icon on the HUD.
+- `uses`: how many times it can be used (like Triple Nitro).
+- `weights`: how likely it is when you're **[in 1st, in the middle, near the back]**.
+  Use `0` to never give it in that group.
+- `effects`: any effects from the table above, including `script`.
+
+Item boxes are placed automatically (see `item_rows` in tracks). Look at
+`content/base/items/` for the built-in items and `mods/example_mod/items/` for
+a JSON-only item and a scripted one.
+
+## 3D models for racers
+
+```json
+"character_model": {
+  "file": "models/me.glb",
+  "scale": 1.0,
+  "rotation_y": 0,
+  "offset": [0, 0, 0],
+  "animations": { "idle": "Idle", "drive": "Drive", "steer_left": "LeanLeft", "steer_right": "LeanRight",
+                  "boost": "Boost", "skill": "Special", "hit": "Hit", "win": "Cheer", "lose": "Sad" }
+},
+"kart_model": {
+  "file": "models/my_kart.glb",
+  "scale": 1.0,
+  "rotation_y": 0,
+  "seat": [0, 0.55, 0],
+  "wheels": [],
+  "front_wheels": []
+}
+```
+- Use either, both or neither. Without `kart_model` you get the default kart
+  (in your colors); without `character_model` you get the default driver.
+- **Animations** are chosen automatically from what the kart is doing. If you
+  leave `animations` out, the game guesses from the names (an animation with
+  "idle" in its name becomes idle, "drive"/"run" becomes drive, "left"/"right",
+  "boost", "skill"/"attack", "hit"/"spin", "win"/"cheer"/"victory", "lose"/"sad").
+  Only `idle` is really needed.
+- **Wheels**: any part with "wheel" in its name spins. Ones with "front"/"F"
+  in the name (e.g. `Wheel_FL`) also turn when steering. Or list node names in
+  `wheels` / `front_wheels`. A kart animation (e.g. a bouncing engine) loops.
+- The character's origin (0,0,0) is placed at the kart's `seat`.
+
+**Making models in Blender (free):**
+1. Model facing **-Y** in Blender (that's "forward" for the game), 1 unit = 1 meter.
+   A kart is about 1.5 m wide and 2.5 m long, with wheels resting on the ground (z = 0).
+2. For animations, use an Armature or animate objects directly; give each Action
+   a clear name (Idle, Drive, Cheer...) and push it to the NLA or tick "All Actions" when exporting.
+3. **File → Export → glTF 2.0**, Format: **glTF Binary (.glb)**, with "Animation" enabled.
+4. Import it with Create a Racer, or put it in your mod's `models/` folder.
+
+The example mod's racer **Rivet** (`mods/example_mod/racers/rivet.json`) uses an
+animated robot and a rocket kart. `tools/make_example_models.gd` shows how they're built.
 
 ## Tracks
 
@@ -162,7 +269,11 @@ and 2.4 m long. Use `model_scale` and `model_rotation_y` to fix size or directio
   "tree_count": 90,
   "tree_color": "#2e6b2a",
   "model": "",
-  "model_collision": false
+  "model_collision": false,
+  "road": true,
+  "ground": true,
+  "item_rows": [0.22, 0.62],
+  "items_per_row": 4
 }
 ```
 
@@ -195,6 +306,30 @@ striped curbs, walls, start line, boost pads, ground and trees automatically.
 3. **Build scenery in Blender:** set `"model": "models/scenery.glb"` to add your
    own buildings, bridges, mountains and so on around the generated road. With
    `"model_collision": true` karts can drive on and bump into the model too.
+
+### Tracks made entirely from a 3D model
+Build the whole track (road, walls, ground, scenery) in Blender, then:
+```json
+{ "id": "lava_loop", "name": "Lava Loop", "model": "models/lava_loop.glb",
+  "model_collision": true, "road": false, "ground": false, "tree_count": 0 }
+```
+The game still needs a **racing line**: it decides where the race starts, counts
+laps, places racers, guides the computer drivers and respawns you. Two ways to
+give it one:
+
+- **Markers in the model (easiest for Blender users):** add Empties along the
+  middle of your road, in race order, named `Path_001`, `Path_002`, `Path_003`...
+  `Path_001` is the start/finish line, and the race heads toward `Path_002`.
+  Optional markers: `ItemBox...` (an item box at each), `BoostPad...` (a boost
+  pad, facing the Empty's -Y), `Start` (where you appear in free roam).
+  The example mod's **Loop Park** works like this.
+- **Record it in game:** main menu → **Import Track Model** (Dev build, works on
+  phones too). You're dropped onto your model in free roam with the recorder
+  running: drive the route pressing **+ Point** (F5) at each corner, starting at
+  the finish line, then **Preview** and **Save track**. The points are saved into
+  the track's file, and from then on it's a normal race track.
+
+Item boxes default to two rows (`item_rows`); set `"item_rows": []` for none.
 
 ## Dev console commands
 

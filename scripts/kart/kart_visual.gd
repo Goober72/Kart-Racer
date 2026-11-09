@@ -1,7 +1,15 @@
 class_name KartVisual
 extends Node3D
-## Builds what a kart looks like. Uses simple shapes by default; a racer can
-## point "model" at a .glb/.gltf file in its mod folder to use a custom model.
+## Builds what a kart looks like: a kart plus a driver sitting in its seat.
+##
+## Both parts use simple shapes by default. A racer can replace either one:
+##   "kart_model":      {"file": "models/kart.glb", "seat": [0, 0.55, 0], ...}
+##   "character_model": {"file": "models/me.glb", "animations": {"idle": "Idle", ...}}
+## Character animations are picked automatically from what the kart is doing
+## (idle, drive, steer_left, steer_right, boost, skill, hit, win, lose).
+## The older single "model" field (replaces kart and driver together) still works.
+
+const DEFAULT_SEAT := Vector3(0, 0.55, 0)
 
 var _pivot: Node3D
 var _body_root: Node3D
@@ -14,6 +22,17 @@ var _flash_ring: MeshInstance3D
 var _flash_time: float = 0.0
 var _wheel_spin: float = 0.0
 var _spin_angle: float = 0.0
+# Imported model wheels: node -> original basis
+var _model_wheels: Dictionary = {}
+var _model_front: Array[Node3D] = []
+# Character animation
+var _anim: AnimationPlayer
+var _anim_map: Dictionary = {}
+var _anim_current: String = ""
+var _skill_anim_time: float = 0.0
+var _hit_anim_time: float = 0.0
+## Animations found in the character model (shown in the racer creator).
+var found_animations: PackedStringArray = PackedStringArray()
 
 
 func build(racer: Dictionary) -> void:
@@ -22,11 +41,40 @@ func build(racer: Dictionary) -> void:
 	_body_root = Node3D.new()
 	_pivot.add_child(_body_root)
 
-	var custom := _load_custom_model(racer)
-	if custom != null:
-		_body_root.add_child(custom)
+	var legacy := _load_legacy_model(racer)
+	if legacy != null:
+		_body_root.add_child(legacy)
 	else:
-		_build_default(racer)
+		var seat := DEFAULT_SEAT
+		var kart_cfg: Dictionary = racer.get("kart_model", {})
+		var kart_scene := _load_part(racer, kart_cfg)
+		if kart_scene != null:
+			_body_root.add_child(kart_scene)
+			seat = ModelLoader.vec3(kart_cfg.get("seat"), DEFAULT_SEAT)
+			for w in ModelLoader.find_wheels(kart_scene, kart_cfg.get("wheels", [])):
+				_model_wheels[w] = w.basis
+			var front_names: Array = kart_cfg.get("front_wheels", [])
+			for w in _model_wheels.keys():
+				if front_names.has(str(w.name)) or (front_names.is_empty() and ModelLoader.is_front_wheel(w)):
+					_model_front.append(w)
+			var kart_anim := ModelLoader.find_animation_player(kart_scene)
+			if kart_anim != null:
+				var list := kart_anim.get_animation_list()
+				if not list.is_empty():
+					var a := kart_anim.get_animation(list[0])
+					a.loop_mode = Animation.LOOP_LINEAR
+					kart_anim.play(list[0])
+		else:
+			_build_default_kart(racer)
+
+		var char_cfg: Dictionary = racer.get("character_model", {})
+		var char_scene := _load_part(racer, char_cfg)
+		if char_scene != null:
+			char_scene.position += seat
+			_body_root.add_child(char_scene)
+			_setup_animations(char_scene, char_cfg.get("animations", {}))
+		else:
+			_build_default_driver(racer, seat)
 	_build_effects()
 
 
@@ -73,6 +121,11 @@ func update_pose(kart: Kart, delta: float) -> void:
 		w.rotation.x = -_wheel_spin
 	for w in _front_wheels:
 		w.rotation.y = -kart.steer_input * 0.4
+	for w in _model_wheels.keys():
+		if is_instance_valid(w):
+			var steer := -kart.steer_input * 0.4 if _model_front.has(w) else 0.0
+			w.basis = _model_wheels[w] * Basis(Vector3.UP, steer) * Basis(Vector3.RIGHT, -_wheel_spin)
+	_update_animation(kart, delta)
 
 	var level := kart.drift_level()
 	for s in _sparks:
@@ -101,6 +154,67 @@ func _process(delta: float) -> void:
 	# Only used by the menu preview (no Kart parent).
 	if not get_parent() is Kart:
 		rotate_y(delta * 0.6)
+		_play("idle")
+
+
+## Plays a named slot animation in the preview (racer creator "test" buttons).
+func preview_animation(slot: String) -> void:
+	_play(slot, true)
+
+
+func _setup_animations(scene: Node, overrides: Dictionary) -> void:
+	_anim = ModelLoader.find_animation_player(scene)
+	if _anim == null:
+		return
+	found_animations = _anim.get_animation_list()
+	_anim_map = ModelLoader.map_animations(found_animations, overrides)
+	for slot in ModelLoader.LOOPING:
+		if _anim_map.has(slot):
+			var a := _anim.get_animation(_anim_map[slot])
+			if a != null:
+				a.loop_mode = Animation.LOOP_LINEAR
+	_play("idle")
+
+
+func _play(slot: String, restart: bool = false) -> void:
+	if _anim == null:
+		return
+	var name: String = _anim_map.get(slot, _anim_map.get("drive", ""))
+	if name == "" or (name == _anim_current and not restart):
+		return
+	_anim_current = name
+	_anim.play(name, 0.15)
+
+
+func _update_animation(kart: Kart, delta: float) -> void:
+	_skill_anim_time = maxf(_skill_anim_time - delta, 0.0)
+	_hit_anim_time = maxf(_hit_anim_time - delta, 0.0)
+	var slot := "idle"
+	if kart.finished:
+		slot = "win" if kart.place <= 3 else "lose"
+	elif kart.spin_time > 0.0 or _hit_anim_time > 0.0:
+		slot = "hit"
+	elif _skill_anim_time > 0.0:
+		slot = "skill"
+	elif kart.is_boosting():
+		slot = "boost"
+	elif kart.steer_input < -0.4 and absf(kart.speed) > 2.0:
+		slot = "steer_left"
+	elif kart.steer_input > 0.4 and absf(kart.speed) > 2.0:
+		slot = "steer_right"
+	elif absf(kart.speed) > 1.0:
+		slot = "drive"
+	if not _anim_map.has(slot):
+		slot = "drive" if absf(kart.speed) > 1.0 else "idle"
+	_play(slot)
+
+
+func on_skill_used() -> void:
+	_skill_anim_time = 0.8
+
+
+func on_hit() -> void:
+	_hit_anim_time = 0.8
 
 
 func _align_up(up: Vector3) -> Basis:
@@ -113,30 +227,30 @@ func _align_up(up: Vector3) -> Basis:
 	return Basis(right, up, -fwd)
 
 
-func _load_custom_model(racer: Dictionary) -> Node3D:
+## Old style: one model that replaces both kart and driver.
+func _load_legacy_model(racer: Dictionary) -> Node3D:
 	var model_file := str(racer.get("model", ""))
 	if model_file == "":
 		return null
-	var path := str(racer.get("_dir", "")).path_join(model_file)
-	if not FileAccess.file_exists(path):
-		push_warning("Racer model not found: " + path)
+	return _load_part(racer, {"file": model_file, "scale": racer.get("model_scale", 1.0),
+		"rotation_y": racer.get("model_rotation_y", 0.0)})
+
+
+## Loads a kart_model / character_model entry. Returns null if not set or broken.
+func _load_part(racer: Dictionary, cfg: Variant) -> Node3D:
+	if not cfg is Dictionary or str(cfg.get("file", "")) == "":
 		return null
-	var doc := GLTFDocument.new()
-	var state := GLTFState.new()
-	var err := doc.append_from_file(path, state)
-	if err != OK:
-		push_warning("Could not load racer model (%s): %s" % [error_string(err), path])
-		return null
-	var scene := doc.generate_scene(state) as Node3D
+	var path := str(racer.get("_dir", "")).path_join(str(cfg["file"]))
+	var scene := ModelLoader.load_scene(path)
 	if scene == null:
 		return null
-	var s := float(racer.get("model_scale", 1.0))
-	scene.scale = Vector3.ONE * s
-	scene.rotation.y = deg_to_rad(float(racer.get("model_rotation_y", 0.0)))
+	scene.scale = Vector3.ONE * float(cfg.get("scale", 1.0))
+	scene.rotation.y = deg_to_rad(float(cfg.get("rotation_y", 0.0)))
+	scene.position = ModelLoader.vec3(cfg.get("offset"), Vector3.ZERO)
 	return scene
 
 
-func _build_default(racer: Dictionary) -> void:
+func _build_default_kart(racer: Dictionary) -> void:
 	var body_col := Color.html(str(racer.get("body_color", "#d83a3a")))
 	var accent := Color.html(str(racer.get("accent_color", "#ffffff")))
 	var skin := Color.html(str(racer.get("driver_color", "#f2c38f")))
@@ -156,14 +270,22 @@ func _build_default(racer: Dictionary) -> void:
 	var sw := _cyl(0.18, 0.05, Vector3(0, 0.95, -0.55), dark)
 	sw.rotation.x = deg_to_rad(60)
 
-	# Driver
-	_capsule(0.32, 0.9, Vector3(0, 1.05, 0.0), accent)
-	_sphere(0.34, Vector3(0, 1.75, -0.05), skin)
-	var hel := _sphere(0.38, Vector3(0, 1.85, 0.0), helmet)
-	hel.scale = Vector3(1, 0.8, 1)
-	_box(Vector3(0.5, 0.12, 0.08), Vector3(0, 1.78, -0.36), dark)  # visor
+	_build_default_wheels(dark, accent)
 
-	# Wheels
+
+func _build_default_driver(racer: Dictionary, seat: Vector3) -> void:
+	var accent := Color.html(str(racer.get("accent_color", "#ffffff")))
+	var skin := Color.html(str(racer.get("driver_color", "#f2c38f")))
+	var helmet := Color.html(str(racer.get("helmet_color", "#3a6fd8")))
+	var dark := Color(0.12, 0.12, 0.14)
+	_capsule(0.32, 0.9, seat + Vector3(0, 0.5, 0.0), accent)
+	_sphere(0.34, seat + Vector3(0, 1.2, -0.05), skin)
+	var hel := _sphere(0.38, seat + Vector3(0, 1.3, 0.0), helmet)
+	hel.scale = Vector3(1, 0.8, 1)
+	_box(Vector3(0.5, 0.12, 0.08), seat + Vector3(0, 1.23, -0.36), dark)  # visor
+
+
+func _build_default_wheels(dark: Color, accent: Color) -> void:
 	for pos in [Vector3(-0.85, 0.38, -1.0), Vector3(0.85, 0.38, -1.0), Vector3(-0.85, 0.42, 0.9), Vector3(0.85, 0.42, 0.9)]:
 		var hub := Node3D.new()
 		hub.position = pos

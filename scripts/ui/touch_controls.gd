@@ -11,7 +11,8 @@ const BUTTONS := [
 	["accelerate",  "GO",    Vector2(1, 1), Vector2(-125, -150), 105.0],
 	["brake",       "BRAKE", Vector2(1, 1), Vector2(-330, -85), 70.0],
 	["drift",       "DRIFT", Vector2(1, 1), Vector2(-305, -270), 75.0],
-	["ability",     "POWER", Vector2(1, 1), Vector2(-120, -365), 68.0],
+	["ability",     "SKILL", Vector2(1, 1), Vector2(-120, -365), 68.0],
+	["item",        "ITEM",  Vector2(1, 1), Vector2(-300, -440), 62.0],
 	["respawn",     "R",     Vector2(0, 0), Vector2(60, 230), 42.0],
 	["pause",       "II",    Vector2(1, 0), Vector2(-60, 120), 42.0],
 ]

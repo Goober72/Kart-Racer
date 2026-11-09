@@ -4,8 +4,13 @@ extends Node3D
 ##
 ## The points are joined into a smooth closed loop. The road, curbs, walls,
 ## start line, boost pads, ground and trees are all generated from that loop,
-## so making a track is just a matter of listing points. Optionally a track can
-## add a custom 3D model (.glb/.gltf) for extra scenery or even its own collision.
+## so making a track is just a matter of listing points.
+##
+## A track can also use a 3D model (.glb) made in Blender:
+##   "model": "models/my_track.glb", "model_collision": true, "road": false
+## The racing line then comes from "points" or, if those are missing, from
+## empty objects in the model named Path_001, Path_002, ... (in order).
+## Empties named ItemBox... and BoostPad... place item boxes and boost pads.
 
 var data: Dictionary = {}
 var curve: Curve3D
@@ -13,6 +18,9 @@ var length: float = 0.0
 var width: float = 14.0
 var min_y: float = 0.0
 var free_roam: bool = false
+## Points came from the track model's Path markers.
+var points_from_model: bool = false
+var _model: Node3D
 
 const SAMPLE_STEP := 2.0
 
@@ -25,18 +33,30 @@ func build(track_data: Dictionary) -> void:
 	for p in data.get("points", []):
 		points.append(Vector3(float(p[0]), float(p[1]), float(p[2])))
 
+	_build_custom_model()
+	if points.size() < 4 and _model != null:
+		points = _marker_points("path")
+		points_from_model = points.size() >= 4
+
 	if points.size() >= 4:
 		_build_curve(points)
-		_build_road()
-		_build_start_line()
+		if data.get("road", true):
+			_build_road()
+			_build_start_line()
+		if data.get("start_gantry", true):
+			_build_gantry()
 		_build_boost_pads()
+		_build_item_boxes()
 	else:
 		curve = null
 		length = 0.0
-		min_y = 0.0
-	_build_ground()
-	_build_trees()
-	_build_custom_model()
+		free_roam = true
+		min_y = _model_min_y() if _model != null else 0.0
+	if data.get("ground", true):
+		_build_ground()
+		_build_trees()
+	elif _model != null:
+		min_y = minf(min_y, _model_min_y())
 
 
 ## Offset along the loop (0..length) closest to a world position.
@@ -72,7 +92,35 @@ func grid_transform(index: int) -> Transform3D:
 
 
 func get_points() -> Array:
+	if points_from_model and curve != null:
+		var out := []
+		for i in curve.point_count - 1:
+			var p := curve.get_point_position(i)
+			out.append([snappedf(p.x, 0.1), snappedf(p.y, 0.1), snappedf(p.z, 0.1)])
+		return out
 	return data.get("points", [])
+
+
+## Where to start when there's no racing line yet (free roam).
+## Uses a model empty named "Start", then the track's "spawn": [x, y, z].
+func spawn_point() -> Vector3:
+	if _model != null:
+		var starts := _markers("start")
+		if not starts.is_empty():
+			return starts[0].global_position + Vector3.UP * 1.0
+	if data.has("spawn"):
+		return ModelLoader.vec3(data["spawn"], Vector3(0, 1, 0))
+	if _model != null:
+		var top := -INF
+		for node in _model.find_children("*", "MeshInstance3D", true, false):
+			var mi := node as MeshInstance3D
+			if mi.mesh != null:
+				var box := mi.global_transform * mi.mesh.get_aabb()
+				if box.has_point(Vector3(0, box.get_center().y, 0)) or box.position.x <= 0.0 and box.end.x >= 0.0 and box.position.z <= 0.0 and box.end.z >= 0.0:
+					top = maxf(top, box.end.y)
+		if top > -INF:
+			return Vector3(0, top + 2.0, 0)
+	return Vector3(0, 1, 0)
 
 
 # --------------------------------------------------------------------------
@@ -225,6 +273,12 @@ func _build_start_line() -> void:
 			_quad(st, o, o + right * size, o + right * size + fwd * size, o + fwd * size, up, c)
 	_add_mesh(st, true)
 
+
+func _build_gantry() -> void:
+	var frame := _frame(0.0)
+	var pos: Vector3 = frame[0]
+	var fwd: Vector3 = frame[1]
+	var right: Vector3 = frame[2]
 	# A simple gantry over the start line.
 	var gantry_col := _color("curb_color_a")
 	for side in [-1.0, 1.0]:
@@ -253,7 +307,31 @@ func _build_start_line() -> void:
 	label.rotation.y = PI
 
 
+func _build_item_boxes() -> void:
+	if _model != null:
+		var markers := _markers("itembox")
+		if not markers.is_empty():
+			for m in markers:
+				var box := ItemBox.new()
+				add_child(box)
+				box.global_position = m.global_position
+			return
+	var per_row := clampi(int(data.get("items_per_row", 4)), 1, 8)
+	for row in data.get("item_rows", []):
+		var at := float(row)
+		for i in per_row:
+			var lateral := (i - (per_row - 1) * 0.5) * (width * 0.8 / maxf(per_row, 1))
+			var box := ItemBox.new()
+			add_child(box)
+			box.global_transform = transform_at(at * length, lateral, 0.0)
+
+
 func _build_boost_pads() -> void:
+	if _model != null:
+		for m in _markers("boostpad"):
+			var pad := BoostPad.new()
+			add_child(pad)
+			pad.global_transform = m.global_transform.orthonormalized()
 	for entry in data.get("boost_pads", []):
 		var at := 0.0
 		var lateral := 0.0
@@ -349,22 +427,56 @@ func _build_custom_model() -> void:
 	var model_file := str(data.get("model", ""))
 	if model_file == "":
 		return
-	var path := str(data.get("_dir", "")).path_join(model_file)
-	if not FileAccess.file_exists(path):
-		push_warning("Track model not found: " + path)
-		return
-	var doc := GLTFDocument.new()
-	var state := GLTFState.new()
-	if doc.append_from_file(path, state) != OK:
-		push_warning("Could not load track model: " + path)
-		return
-	var scene := doc.generate_scene(state) as Node3D
+	var scene := ModelLoader.load_scene(str(data.get("_dir", "")).path_join(model_file))
 	if scene == null:
 		return
+	scene.scale = Vector3.ONE * float(data.get("model_scale", 1.0))
 	add_child(scene)
+	_model = scene
 	if data.get("model_collision", false):
 		for node in scene.find_children("*", "MeshInstance3D", true, false):
-			(node as MeshInstance3D).create_trimesh_collision()
+			var mi := node as MeshInstance3D
+			if mi.mesh == null:
+				continue
+			var body := StaticBody3D.new()
+			var shape := CollisionShape3D.new()
+			var concave := mi.mesh.create_trimesh_shape()
+			if concave == null:
+				continue
+			concave.backface_collision = true
+			shape.shape = concave
+			body.add_child(shape)
+			mi.add_child(body)
+
+
+## Model nodes whose name starts with `prefix` (any case), sorted by name.
+func _markers(prefix: String) -> Array[Node3D]:
+	var out: Array[Node3D] = []
+	if _model == null:
+		return out
+	for node in _model.find_children("*", "Node3D", true, false):
+		if str(node.name).to_lower().begins_with(prefix):
+			out.append(node)
+	out.sort_custom(func(a: Node3D, b: Node3D) -> bool: return str(a.name).naturalnocasecmp_to(str(b.name)) < 0)
+	return out
+
+
+func _marker_points(prefix: String) -> Array[Vector3]:
+	var pts: Array[Vector3] = []
+	for m in _markers(prefix):
+		pts.append(to_local(m.global_position))
+	return pts
+
+
+func _model_min_y() -> float:
+	var lowest := INF
+	for node in _model.find_children("*", "MeshInstance3D", true, false):
+		var mi := node as MeshInstance3D
+		if mi.mesh == null:
+			continue
+		var box := mi.global_transform * mi.mesh.get_aabb()
+		lowest = minf(lowest, box.position.y)
+	return 0.0 if lowest == INF else lowest
 
 
 func _plain(c: Color) -> StandardMaterial3D:

@@ -23,6 +23,11 @@ var _history_pos: int = 0
 var _rec_points: Array[Vector3] = []
 var _rec_id: String = "my_track"
 var _rec_markers: Node3D
+## Track being edited by the recorder ({} = a brand new track). Saving keeps
+## all its other settings (model, colors...) and only replaces the points.
+var _rec_target: Dictionary = {}
+## Set by the track model importer: start recording when this track loads.
+var pending_record_track: String = ""
 
 # Free camera
 var _freecam: Camera3D
@@ -48,6 +53,14 @@ func attach_race(race_node: Node) -> void:
 	_freecam = null
 	_freecam_on = false
 	_rec_markers = null
+	if pending_record_track != "" and str(race.track.data.get("id", "")) == pending_record_track:
+		pending_record_track = ""
+		_cmd_track_edit([])
+		_print("[color=#ffb84d]Imported track model![/color] Now drive the route (or fly with Free cam) and press + Point / F5 at every corner, going one way round. Start where the race should start. Then Preview and Save track.")
+		if _touch_panel != null:
+			_touch_panel.visible = true
+		elif not _console.visible:
+			_toggle_console()
 	_refresh_markers()
 
 
@@ -278,7 +291,6 @@ func _with_race(fn: Callable) -> void:
 
 
 func _cmd_reload(_args: Array) -> void:
-	AbilityFactory.clear_cache()
 	ModLoader.reload()
 	if is_instance_valid(race) and race.is_inside_tree():
 		if not GameState.track_override.is_empty():
@@ -405,6 +417,7 @@ func _record_position() -> Vector3:
 func _cmd_track_new(args: Array) -> void:
 	_rec_id = str(args[0]) if args.size() > 0 else "my_track"
 	_rec_points.clear()
+	_rec_target = {}
 	_refresh_markers()
 	_print("Recording track '%s'. Drive (or fly with F6) around your route and press F5 at each corner. Go clockwise or counter-clockwise, but keep going one way. Then: track_preview, track_save." % _rec_id)
 
@@ -414,9 +427,10 @@ func _cmd_track_edit(_args: Array) -> void:
 		_rec_points.clear()
 		for p in race.track.get_points():
 			_rec_points.append(Vector3(float(p[0]), float(p[1]), float(p[2])))
-		_rec_id = str(race.track.data.get("id", "my_track")) + "_edit"
+		_rec_target = race.track.data.duplicate(true)
+		_rec_id = str(_rec_target.get("id", "my_track"))
 		_refresh_markers()
-		_print("Copied %d points from the current track into the recorder as '%s'." % [_rec_points.size(), _rec_id]))
+		_print("Editing '%s' (%d points). track_save saves over it (or a copy, for built-in tracks)." % [_rec_id, _rec_points.size()]))
 
 
 func _cmd_track_point(_args: Array) -> void:
@@ -439,9 +453,13 @@ func _recorded_track_data() -> Dictionary:
 	for p in _rec_points:
 		pts.append([p.x, p.y, p.z])
 	var data := ModLoader.TRACK_DEFAULTS.duplicate(true)
+	if not _rec_target.is_empty():
+		data = _rec_target.duplicate(true)
+	else:
+		data["name"] = _rec_id.capitalize()
 	data["id"] = _rec_id
-	data["name"] = _rec_id.capitalize()
 	data["points"] = pts
+	data["free_roam"] = false
 	return data
 
 
@@ -450,7 +468,8 @@ func _cmd_track_preview(_args: Array) -> void:
 		_print("[color=#ffcc55]Need at least 4 points (have %d).[/color]" % _rec_points.size())
 		return
 	var data := _recorded_track_data()
-	data["_dir"] = ""
+	if not data.has("_dir"):
+		data["_dir"] = ""
 	data["_mod"] = "recorder"
 	GameState.track_override = data
 	_with_race(func():
@@ -467,6 +486,23 @@ func _cmd_track_save(args: Array) -> void:
 		return
 	if args.size() > 0:
 		_rec_id = str(args[0])
+	var target_dir := str(_rec_target.get("_dir", ""))
+	if target_dir != "" and not target_dir.begins_with("res://"):
+		# Save back into the mod the track came from (keeps its model working).
+		var full := _recorded_track_data()
+		var clean := {}
+		for key in full.keys():
+			if not str(key).begins_with("_"):
+				clean[key] = full[key]
+		var target_path := target_dir.path_join("tracks").path_join(_rec_id + ".json")
+		var tf := FileAccess.open(target_path, FileAccess.WRITE)
+		if tf == null:
+			_print("[color=#ff6060]Could not write %s (%s)[/color]" % [target_path, error_string(FileAccess.get_open_error())])
+			return
+		tf.store_string(JSON.stringify(clean, "  "))
+		tf.close()
+		_print("Saved %s. Run [b]reload[/b] (or go to the menu) to race on it." % target_path)
+		return
 	var mod_dir := ModLoader.get_writable_mod_root().path_join("my_tracks")
 	DirAccess.make_dir_recursive_absolute(mod_dir.path_join("tracks"))
 	var manifest_path := mod_dir.path_join("mod.json")
@@ -483,6 +519,10 @@ func _cmd_track_save(args: Array) -> void:
 		"boost_pads": [],
 		"points": _recorded_track_data()["points"],
 	}
+	# Editing a built-in track: keep its look in the copy.
+	for key in _rec_target.keys():
+		if not str(key).begins_with("_") and not data.has(key) and key != "model":
+			data[key] = _rec_target[key]
 	var path := mod_dir.path_join("tracks").path_join(_rec_id + ".json")
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f == null:

@@ -6,6 +6,47 @@
   "accent_color": "#ffd23f",
   "helmet_color": "#1d1d24",
   "driver_color": "#8d5a3b",
-  "stats": { "max_speed": 34, "acceleration": 14, "handling": 1.9, "drift": 1.1 },
-  "ability": { "type": "boost", "name": "Afterburner", "duration": 1.2, "power": 1.5, "cooldown": 9 }
+  "stats": {
+    "max_speed": 34,
+    "acceleration": 14,
+    "handling": 1.9,
+    "drift": 1.1
+  },
+  "ability": {
+    "name": "Afterburner",
+    "cooldown": 8,
+    "charged_cooldown": 13,
+    "tap": {
+      "name": "Afterburner",
+      "effects": [
+        {
+          "type": "boost",
+          "duration": 1.0,
+          "power": 1.55
+        }
+      ]
+    },
+    "charged": {
+      "name": "Smoke Show",
+      "effects": [
+        {
+          "type": "boost",
+          "duration": 1.8,
+          "power": 1.5
+        },
+        {
+          "type": "drop",
+          "shape": "cloud",
+          "count": 3,
+          "spread": 4,
+          "radius": 3,
+          "single_use": false,
+          "lifetime": 9,
+          "hit": {
+            "slow": 0.45
+          }
+        }
+      ]
+    }
+  }
 }

@@ -103,7 +103,8 @@ func _setup_controls() -> void:
 	_add_action("steer_left", [KEY_A, KEY_LEFT], [JOY_BUTTON_DPAD_LEFT], [[JOY_AXIS_LEFT_X, -1.0]])
 	_add_action("steer_right", [KEY_D, KEY_RIGHT], [JOY_BUTTON_DPAD_RIGHT], [[JOY_AXIS_LEFT_X, 1.0]])
 	_add_action("drift", [KEY_SPACE, KEY_SHIFT], [JOY_BUTTON_RIGHT_SHOULDER, JOY_BUTTON_B], [])
-	_add_action("ability", [KEY_E, KEY_F], [JOY_BUTTON_X, JOY_BUTTON_LEFT_SHOULDER], [])
+	_add_action("ability", [KEY_E, KEY_F], [JOY_BUTTON_X], [])
+	_add_action("item", [KEY_Q, KEY_CTRL], [JOY_BUTTON_LEFT_SHOULDER], [])
 	_add_action("respawn", [KEY_R], [JOY_BUTTON_Y], [])
 	_add_action("pause", [KEY_ESCAPE, KEY_P], [JOY_BUTTON_START], [])
 

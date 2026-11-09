@@ -6,13 +6,25 @@
   "accent_color": "#7a4a1e",
   "helmet_color": "#fff3c4",
   "driver_color": "#f4d9a0",
-  "stats": { "max_speed": 30, "acceleration": 18, "handling": 2.4, "drift": 1.1 },
+  "stats": {
+    "max_speed": 30,
+    "acceleration": 18,
+    "handling": 2.4,
+    "drift": 1.1
+  },
   "ability": {
     "type": "script",
     "script": "scripts/comeback_boost.gd",
     "name": "Comeback Crunch",
     "cooldown": 8,
+    "charged_cooldown": 12,
     "base_duration": 0.8,
-    "extra_per_place": 0.35
+    "extra_per_place": 0.35,
+    "tap": {
+      "name": "Comeback Crunch"
+    },
+    "charged": {
+      "name": "Golden Crunch"
+    }
   }
 }

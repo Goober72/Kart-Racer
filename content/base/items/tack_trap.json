@@ -1,0 +1,25 @@
+{
+  "id": "tack_trap",
+  "name": "Tack Trap",
+  "label": "T",
+  "color": "#b8b8c4",
+  "description": "Scatter tacks that slow anyone who drives over them.",
+  "weights": [
+    4,
+    3,
+    1
+  ],
+  "effects": [
+    {
+      "type": "drop",
+      "shape": "spikes",
+      "radius": 2.6,
+      "single_use": false,
+      "lifetime": 15,
+      "hit": {
+        "slow": 0.5,
+        "bounce": 3
+      }
+    }
+  ]
+}

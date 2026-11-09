@@ -1,0 +1,19 @@
+{
+  "id": "nitro",
+  "name": "Nitro Can",
+  "label": "N",
+  "color": "#ff9933",
+  "description": "A quick boost.",
+  "weights": [
+    6,
+    5,
+    3
+  ],
+  "effects": [
+    {
+      "type": "boost",
+      "duration": 1.4,
+      "power": 1.4
+    }
+  ]
+}

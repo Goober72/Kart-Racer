@@ -1,0 +1,14 @@
+{
+  "id": "loop_park",
+  "name": "Loop Park",
+  "description": "Example mod track built from a 3D model. The racing line, item boxes and boost pad come from markers inside the model.",
+  "model": "models/loop_park.glb",
+  "model_collision": true,
+  "road": false,
+  "ground": false,
+  "tree_count": 0,
+  "width": 16,
+  "laps": 3,
+  "sky_top_color": "#5a4fd1",
+  "sky_horizon_color": "#ffd1f0"
+}

@@ -1,8 +1,9 @@
 # Kart Racer
 
 An original arcade kart racer built to be modded. Drift through corners, charge
-up boosts, use your racer's special ability, and race against computer drivers.
-Add your own racers and tracks by dropping a folder into `mods/`.
+up boosts, grab items, use your racer's unique skill (tap it, or hold to charge
+it), and race against computer drivers. Add your own racers, karts, tracks,
+items and skills, including 3D models with animations.
 
 Made with [Godot 4.3](https://godotengine.org/download/archive/4.3-stable/) (free and open source).
 
@@ -42,9 +43,10 @@ Settings → Pages → Source: **GitHub Actions**, then re-run the latest
 and host the folder anywhere (itch.io works: upload it as an HTML game).
 
 Notes for the browser version:
-- Touch controls: `<` `>` steer, **GO**, **BRAKE**, **DRIFT** (hold while turning), **POWER** (ability), **R** respawn, **II** pause.
+- Touch controls: `<` `>` steer, **GO**, **BRAKE**, **DRIFT** (hold while turning), **SKILL** (tap, or hold for the charged skill), **ITEM**, **R** respawn, **II** pause.
 - The **DEV** button at the top replaces the F-keys (console, debug info, free cam, track recorder, reload).
-- Racers you make with **Create a Racer** and tracks you record are saved in the browser's storage.
+- **Create a Racer** and **Import Track Model** can load `.glb` models straight from your phone.
+- Racers you make and tracks you record are saved in the browser's storage.
   Use **Share file** in the creator to download your racer's `.json` file.
 - It's a ~35 MB download the first time. Works best in Chrome or Safari on a recent phone.
 
@@ -78,19 +80,28 @@ Copy the `mods/` folder next to the exported game so mods are found.
 | Brake / reverse | S / Down | LT |
 | Steer | A D / Left Right | Left stick / D-pad |
 | Drift (hold while turning) | Space / Shift | RB or B |
-| Ability | E / F | X or LB |
+| Skill (tap = quick, hold 1 s = charged) | E / F | X |
+| Use item | Q / Ctrl | LB |
 | Respawn | R | Y |
 | Pause | Esc / P | Start |
 
 **Drifting:** hold drift while turning. Sparks go blue, then orange, then purple.
 Let go to get a boost; the longer the drift, the bigger the boost.
 
+**Skills:** every racer has their own. Tap the button for the quick version, or
+hold it for a second for the stronger charged version (longer cooldown).
+
+**Items:** drive through the floating **?** boxes to get an item. Racers further
+back get better items.
+
 ## Modding
 
 See **[MODDING.md](MODDING.md)**. Short version: a mod is a folder in `mods/`
-with a `mod.json`, plus `racers/*.json` and/or `tracks/*.json`. Tracks are just
-a list of points; the game builds the road, walls and scenery for you. The Dev
-build can record a track while you drive or fly around.
+with a `mod.json`, plus `racers/*.json`, `tracks/*.json` and/or `items/*.json`.
+Skills and items are built from the same effects (boost, hop, shield,
+shockwave, drop a trap, throw a projectile, zap) or your own GDScript. Racers can
+use imported character and kart models with animations; tracks can be a list of
+points (the game builds the road) or a 3D model. The example mod shows all of it.
 
 ## Project layout
 
@@ -103,7 +114,10 @@ scripts/kart/        Kart physics, visuals, player/AI controllers, abilities
 scripts/race/        Race rules, track generator, camera, boost pads
 scripts/ui/          Menus and HUD
 scripts/dev/         Dev-build tools (console, recorder, free cam)
+scripts/effects/     Effects shared by skills and items, traps, projectiles, item boxes
+scripts/util/        Model loading, file picker, script loading
 tests/               Automated smoke test
+tools/               Generator for the example mod's models
 ```
 
 Run the automated test (it races every track with computer drivers):

@@ -6,6 +6,13 @@ extends CharacterBody3D
 ## Driving model: the kart has a scalar `speed` along its facing direction.
 ## Steering rotates the kart. Holding drift while turning starts a drift; the
 ## longer you drift, the bigger the boost when you let go (blue, orange, purple).
+##
+## Skill button: tap for the quick skill, hold for KartAbility.CHARGE_TIME for
+## the charged skill. Item button: use the held item (some items have several uses).
+
+signal skill_used(charged: bool)
+signal got_hit(by: Kart)
+signal item_changed
 
 const GRAVITY := 32.0
 const DRIFT_LEVEL_TIMES := [0.9, 1.9, 3.0]
@@ -39,6 +46,13 @@ var shield_time: float = 0.0
 var spin_time: float = 0.0
 var ability: KartAbility = null
 var respawn_requested: bool = false
+## Seconds the skill button has been held (for charged skills).
+var skill_hold: float = 0.0
+var _skill_was_held: bool = false
+var _skill_fired_charged: bool = false
+## The item being held ({} = none) and how many uses are left.
+var item: Dictionary = {}
+var item_uses: int = 0
 
 # Race progress (managed by the race)
 var distance: float = 0.0
@@ -77,8 +91,35 @@ func setup(racer_data: Dictionary, player: bool) -> void:
 	visual = KartVisual.new()
 	add_child(visual)
 	visual.build(racer)
+	skill_used.connect(func(_c): visual.on_skill_used())
+	got_hit.connect(func(_by): visual.on_hit())
 
 	ability = AbilityFactory.create(self, racer.get("ability", {}), str(racer.get("_dir", "")))
+
+
+func give_item(data: Dictionary) -> void:
+	item = data
+	item_uses = maxi(int(data.get("uses", 1)), 1)
+	item_changed.emit()
+
+
+func use_item() -> void:
+	if item.is_empty():
+		return
+	var data := item
+	item_uses -= 1
+	if item_uses <= 0:
+		item = {}
+		item_uses = 0
+	item_changed.emit()
+	Effects.run(self, data.get("effects", []), str(data.get("_dir", "")))
+
+
+## 0..1 progress towards a charged skill while the button is held.
+func skill_charge_ratio() -> float:
+	if not _skill_was_held or _skill_fired_charged or ability == null or not ability.is_ready():
+		return 0.0
+	return clampf(skill_hold / KartAbility.CHARGE_TIME, 0.0, 1.0)
 
 
 func add_boost(duration: float, power: float) -> void:
@@ -138,8 +179,9 @@ func _physics_process(delta: float) -> void:
 
 	if ability != null:
 		ability.tick(delta)
-		if input.get("ability", false) and spin_time <= 0.0:
-			ability.try_activate()
+		_update_skill(input.get("ability", false), delta)
+	if input.get("item", false) and spin_time <= 0.0:
+		use_item()
 
 	boost_time = maxf(boost_time - delta, 0.0)
 	shield_time = maxf(shield_time - delta, 0.0)
@@ -219,6 +261,24 @@ func _physics_process(delta: float) -> void:
 			speed = lerpf(actual, speed, keep)
 
 	visual.update_pose(self, delta)
+
+
+func _update_skill(held: bool, delta: float) -> void:
+	if held and spin_time <= 0.0:
+		if not _skill_was_held:
+			_skill_was_held = true
+			_skill_fired_charged = false
+			skill_hold = 0.0
+		skill_hold += delta
+		if not _skill_fired_charged and skill_hold >= KartAbility.CHARGE_TIME and ability.is_ready():
+			_skill_fired_charged = true
+			ability.try_activate(true)
+	elif _skill_was_held:
+		if not _skill_fired_charged and skill_hold < KartAbility.CHARGE_TIME:
+			ability.try_activate(false)
+		_skill_was_held = false
+		_skill_fired_charged = false
+		skill_hold = 0.0
 
 
 func _release_drift() -> void:

@@ -17,13 +17,9 @@ const STATS := [
 	["handling", "Handling", 1.9, 2.9],
 	["drift", "Drift charge", 0.9, 1.25],
 ]
-const ABILITIES := ["boost", "hop", "shockwave", "shield"]
-const ABILITY_INFO := {
-	"boost": ["Turbo", "A burst of speed."],
-	"hop": ["Super Hop", "A big jump. Skip corners!"],
-	"shockwave": ["Shockwave", "Slows down karts near you."],
-	"shield": ["Shield", "Blocks shockwaves and softens wall hits."],
-}
+const ABILITIES := AbilityFactory.PRESETS
+const ABILITY_INFO := AbilityFactory.PRESET_INFO
+const ANIM_TEST_ORDER := ["idle", "drive", "steer_left", "steer_right", "boost", "skill", "hit", "win", "lose"]
 ## Stat levels (1-5 each) plus ability power (1-3) must fit in this budget.
 const BUDGET := 15
 
@@ -32,6 +28,15 @@ var _ability_type := "boost"
 var _ability_level := 2
 var _colors := {"body_color": "#2f7de1", "accent_color": "#f5f5f5", "helmet_color": "#f2c14e", "driver_color": "#f2c38f"}
 var _editing_id := ""  # empty = new racer
+## {"file": "models/x.glb", "scale": 1, "rotation_y": 0} or {} for the default look
+var _character_model: Dictionary = {}
+var _kart_model: Dictionary = {}
+var _picker: FilePicker
+var _importing := ""  # "character" or "kart"
+var _model_info: Label
+var _preview: KartVisual
+var _anim_test := 0
+var _scroll: ScrollContainer
 
 var _name_edit: LineEdit
 var _desc_edit: LineEdit
@@ -68,6 +73,7 @@ func _ready() -> void:
 
 	# ---- Left: options (scrolls on small screens) ----
 	var scroll := ScrollContainer.new()
+	_scroll = scroll
 	scroll.custom_minimum_size = Vector2(700, 0)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	columns.add_child(scroll)
@@ -153,8 +159,27 @@ func _ready() -> void:
 	an_row.add_theme_constant_override("separation", 8)
 	left.add_child(an_row)
 	an_row.add_child(_caption("Name it"))
-	_ability_name_edit = _line_edit("Ability name (optional)", 24)
+	_ability_name_edit = _line_edit("Skill name (optional)", 24)
 	an_row.add_child(_ability_name_edit)
+
+	left.add_child(UIKit.label("3D Models (optional, .glb files)", 24, Color(0.75, 0.8, 0.95)))
+	_add_model_row(left, "character", "Character")
+	_add_model_row(left, "kart", "Kart")
+	var seat_row := HBoxContainer.new()
+	seat_row.add_theme_constant_override("separation", 8)
+	left.add_child(seat_row)
+	seat_row.add_child(_caption("Seat height"))
+	seat_row.add_child(UIKit.button(" - ", func(): _nudge_seat(-0.05)))
+	seat_row.add_child(UIKit.button(" + ", func(): _nudge_seat(0.05)))
+	seat_row.add_child(UIKit.button("Test animations", _test_animation, 20))
+	_model_info = UIKit.label("Using the default kart and driver.", 16, Color(0.8, 0.85, 0.95))
+	_model_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_model_info.custom_minimum_size = Vector2(640, 0)
+	left.add_child(_model_info)
+
+	_picker = FilePicker.new()
+	add_child(_picker)
+	_picker.picked.connect(_on_model_picked)
 
 	# ---- Right: preview + actions ----
 	var right := VBoxContainer.new()
@@ -178,6 +203,14 @@ func _ready() -> void:
 		_load_racer(selected)
 	else:
 		_new_racer()
+
+
+## Finger-drag scrolling that also works when the drag starts on a button.
+func _input(event: InputEvent) -> void:
+	if event is InputEventScreenDrag and _scroll != null:
+		var drag := event as InputEventScreenDrag
+		if _scroll.get_global_rect().has_point(drag.position):
+			_scroll.scroll_vertical -= int(drag.relative.y)
 
 
 # ---- Building blocks ---------------------------------------------------------
@@ -215,6 +248,97 @@ func _make_pips(count: int) -> HBoxContainer:
 func _set_pips(box: HBoxContainer, level: int) -> void:
 	for i in box.get_child_count():
 		(box.get_child(i) as ColorRect).color = UIKit.ACCENT if i < level else Color(1, 1, 1, 0.15)
+
+
+func _add_model_row(parent: Control, which: String, title: String) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	parent.add_child(row)
+	row.add_child(_caption(title))
+	row.add_child(UIKit.button("Import", func():
+		_importing = which
+		_status.text = "Pick a .glb file..."
+		_picker.open(PackedStringArray(["*.glb"])), 20))
+	row.add_child(UIKit.button("Size -", func(): _scale_model(which, 0.8), 18))
+	row.add_child(UIKit.button("Size +", func(): _scale_model(which, 1.25), 18))
+	row.add_child(UIKit.button("Turn", func(): _turn_model(which), 18))
+	row.add_child(UIKit.button("Clear", func(): _clear_model(which), 18))
+
+
+func _model_cfg(which: String) -> Dictionary:
+	return _character_model if which == "character" else _kart_model
+
+
+func _on_model_picked(file_name: String, bytes: PackedByteArray) -> void:
+	if not file_name.to_lower().ends_with(".glb"):
+		_status.text = "Please pick a .glb file (in Blender: File > Export > glTF 2.0, format glTF Binary)."
+		return
+	var problem := ModelLoader.validate_bytes(bytes)
+	if problem != "":
+		_status.text = problem
+		return
+	var base := _editing_id if _editing_id != "" else "new_%d" % Time.get_unix_time_from_system()
+	var rel := "models/%s_%s.glb" % [base, _importing]
+	DirAccess.make_dir_recursive_absolute(_mod_dir().path_join("models"))
+	var f := FileAccess.open(_mod_dir().path_join(rel), FileAccess.WRITE)
+	if f == null:
+		_status.text = "Couldn't store the model (%s)." % error_string(FileAccess.get_open_error())
+		return
+	f.store_buffer(bytes)
+	f.close()
+	ModelLoader.clear_cache()
+	var cfg := _model_cfg(_importing)
+	cfg.clear()
+	cfg["file"] = rel
+	cfg["scale"] = 1.0
+	cfg["rotation_y"] = 0.0
+	if _importing == "kart":
+		cfg["seat"] = [0.0, 0.55, 0.0]
+	_status.text = "Imported %s (%d KB). Use Size/Turn until it faces away from the camera, then Save." % [file_name, bytes.size() / 1024]
+	_refresh()
+
+
+func _scale_model(which: String, factor: float) -> void:
+	var cfg := _model_cfg(which)
+	if cfg.is_empty():
+		_status.text = "Import a %s model first." % which
+		return
+	cfg["scale"] = snappedf(clampf(float(cfg.get("scale", 1.0)) * factor, 0.01, 100.0), 0.001)
+	_refresh()
+
+
+func _turn_model(which: String) -> void:
+	var cfg := _model_cfg(which)
+	if cfg.is_empty():
+		_status.text = "Import a %s model first." % which
+		return
+	cfg["rotation_y"] = fposmod(float(cfg.get("rotation_y", 0.0)) + 90.0, 360.0)
+	_refresh()
+
+
+func _clear_model(which: String) -> void:
+	_model_cfg(which).clear()
+	_refresh()
+
+
+func _nudge_seat(d: float) -> void:
+	var seat: Vector3 = ModelLoader.vec3(_kart_model.get("seat"), KartVisual.DEFAULT_SEAT)
+	seat.y = snappedf(seat.y + d, 0.01)
+	if _kart_model.is_empty():
+		_status.text = "Seat height applies to an imported kart."
+		return
+	_kart_model["seat"] = [seat.x, seat.y, seat.z]
+	_refresh()
+
+
+func _test_animation() -> void:
+	if _preview == null or _preview.found_animations.is_empty():
+		_status.text = "No animations found. Import a character model that has animations."
+		return
+	var slot: String = ANIM_TEST_ORDER[_anim_test % ANIM_TEST_ORDER.size()]
+	_anim_test += 1
+	_preview.preview_animation(slot)
+	_status.text = "Playing '%s'." % slot
 
 
 func _add_swatches(parent: Control, key: String, title: String, palette: Array) -> void:
@@ -335,6 +459,8 @@ func _new_racer() -> void:
 	_levels = {"max_speed": 3, "acceleration": 3, "handling": 3, "drift": 3}
 	_ability_type = ABILITIES.pick_random()
 	_ability_level = 2
+	_character_model = {}
+	_kart_model = {}
 	_colors = {"body_color": KART_COLORS.pick_random(), "accent_color": "#f5f5f5",
 		"helmet_color": KART_COLORS.pick_random(), "driver_color": SKIN_COLORS.pick_random()}
 	_name_edit.text = ""
@@ -356,6 +482,8 @@ func _load_racer(r: Dictionary) -> void:
 		_levels[s[0]] = clampi(roundi(remap(v, s[2], s[3], 1.0, 5.0)), 1, 5)
 	var ab: Dictionary = r.get("ability", {})
 	_ability_type = str(ab.get("type", "boost")) if ABILITIES.has(str(ab.get("type", ""))) else "boost"
+	_character_model = (r.get("character_model", {}) as Dictionary).duplicate(true)
+	_kart_model = (r.get("kart_model", {}) as Dictionary).duplicate(true)
 	_ability_level = clampi(int(ab.get("level", 2)), 1, 3)
 	_ability_name_edit.text = str(ab.get("name", ""))
 	_status.text = "Editing %s." % _name_edit.text
@@ -385,23 +513,27 @@ func _refresh() -> void:
 				b.add_theme_stylebox_override(state, sb)
 	for c in _preview_holder.get_children():
 		c.queue_free()
-	_preview_holder.add_child(KartVisual.make_preview(_build_data()))
+	var data := _build_data()
+	data["_dir"] = _mod_dir()
+	_preview = KartVisual.make_preview(data)
+	_preview_holder.add_child(_preview)
+	var parts: Array[String] = []
+	if not _character_model.is_empty():
+		var anims := _preview.found_animations
+		parts.append("Character: %s (size %.2f, turned %d°). Animations: %s" % [_character_model["file"].get_file(),
+			_character_model.get("scale", 1.0), int(_character_model.get("rotation_y", 0)),
+			", ".join(anims) if not anims.is_empty() else "none found"])
+	if not _kart_model.is_empty():
+		var seat: Vector3 = ModelLoader.vec3(_kart_model.get("seat"), KartVisual.DEFAULT_SEAT)
+		parts.append("Kart: %s (size %.2f, turned %d°, seat %.2f)" % [_kart_model["file"].get_file(),
+			_kart_model.get("scale", 1.0), int(_kart_model.get("rotation_y", 0)), seat.y])
+	_model_info.text = "\n".join(parts) if not parts.is_empty() else "Using the default kart and driver."
 
 
 # ---- Output --------------------------------------------------------------------
 
 func _ability_params() -> Dictionary:
-	var lv := float(_ability_level)
 	var p := {"type": _ability_type, "level": _ability_level}
-	match _ability_type:
-		"boost":
-			p.merge({"duration": 1.1 + 0.3 * lv, "power": 1.3 + 0.05 * lv, "cooldown": 10.0 - lv})
-		"hop":
-			p.merge({"height": 10.0 + 2.0 * lv, "push": 4.0 + 2.0 * lv, "cooldown": 8.0 - lv})
-		"shockwave":
-			p.merge({"radius": 10.0 + 3.0 * lv, "slow": 0.35 + 0.1 * lv, "cooldown": 12.0 - lv})
-		"shield":
-			p.merge({"duration": 2.0 + lv, "cooldown": 11.0 - lv})
 	var custom := _ability_name_edit.text.strip_edges()
 	p["name"] = custom if custom != "" else ABILITY_INFO[_ability_type][0]
 	return p
@@ -422,6 +554,10 @@ func _build_data() -> Dictionary:
 		"ability": _ability_params(),
 	}
 	data.merge(_colors)
+	if not _character_model.is_empty():
+		data["character_model"] = _character_model.duplicate(true)
+	if not _kart_model.is_empty():
+		data["kart_model"] = _kart_model.duplicate(true)
 	return data
 
 

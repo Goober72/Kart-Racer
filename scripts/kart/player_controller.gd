@@ -8,6 +8,7 @@ func read(_kart: Kart) -> Dictionary:
 		"throttle": Input.get_action_strength("accelerate") - Input.get_action_strength("brake"),
 		"steer": Input.get_action_strength("steer_right") - Input.get_action_strength("steer_left"),
 		"drift": Input.is_action_pressed("drift"),
-		"ability": Input.is_action_just_pressed("ability"),
+		"ability": Input.is_action_pressed("ability"),
+		"item": Input.is_action_just_pressed("item"),
 		"respawn": Input.is_action_just_pressed("respawn"),
 	}

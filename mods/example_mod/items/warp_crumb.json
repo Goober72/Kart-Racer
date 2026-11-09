@@ -1,0 +1,19 @@
+{
+  "id": "warp_crumb",
+  "name": "Warp Crumb",
+  "label": "W",
+  "color": "#c27aff",
+  "description": "Example mod item with a custom script effect: warps you 35 m up the track.",
+  "weights": [
+    0,
+    2,
+    4
+  ],
+  "effects": [
+    {
+      "type": "script",
+      "script": "scripts/warp_effect.gd",
+      "distance": 35
+    }
+  ]
+}

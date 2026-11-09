@@ -6,6 +6,44 @@
   "accent_color": "#3ac0c0",
   "helmet_color": "#3ac0c0",
   "driver_color": "#f0d0b0",
-  "stats": { "max_speed": 30.5, "acceleration": 18, "handling": 2.5, "drift": 1.0 },
-  "ability": { "type": "shield", "name": "Bubble Guard", "duration": 4, "cooldown": 9 }
+  "stats": {
+    "max_speed": 30.5,
+    "acceleration": 18,
+    "handling": 2.5,
+    "drift": 1.0
+  },
+  "ability": {
+    "name": "Bubble Guard",
+    "cooldown": 7,
+    "charged_cooldown": 12,
+    "tap": {
+      "name": "Bubble Guard",
+      "effects": [
+        {
+          "type": "shield",
+          "duration": 3
+        }
+      ]
+    },
+    "charged": {
+      "name": "Bubble Trap",
+      "effects": [
+        {
+          "type": "shield",
+          "duration": 3.5
+        },
+        {
+          "type": "throw",
+          "homing": true,
+          "color": "#7fd8ff",
+          "size": 0.8,
+          "hit": {
+            "slow": 0.55,
+            "spin": 0.7,
+            "bounce": 5
+          }
+        }
+      ]
+    }
+  }
 }

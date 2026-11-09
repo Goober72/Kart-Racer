@@ -1,0 +1,20 @@
+{
+  "id": "triple_nitro",
+  "name": "Triple Nitro",
+  "label": "N3",
+  "color": "#ff6a1a",
+  "uses": 3,
+  "description": "Three boosts.",
+  "weights": [
+    0,
+    2,
+    5
+  ],
+  "effects": [
+    {
+      "type": "boost",
+      "duration": 1.1,
+      "power": 1.4
+    }
+  ]
+}

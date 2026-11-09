@@ -8,6 +8,8 @@ var lane: float = 0.0
 var skill: float = 1.0
 var _drift_hold: bool = false
 var _stuck_time: float = 0.0
+var _skill_hold_left: float = 0.0
+var _item_wait: float = -1.0
 var _rng := RandomNumberGenerator.new()
 
 
@@ -46,9 +48,27 @@ func read(kart: Kart) -> Dictionary:
 	elif absf(angle) > 0.3 and kart.speed > 16.0:
 		_drift_hold = true
 
+	# Skills: sometimes tap, sometimes hold for the charged version.
+	var dt := 1.0 / Engine.physics_ticks_per_second
 	var use_ability := false
-	if kart.ability != null and kart.ability.is_ready() and absf(angle) < 0.15:
-		use_ability = _rng.randf() < 0.01
+	if _skill_hold_left > 0.0:
+		_skill_hold_left -= dt
+		use_ability = true
+	elif kart.ability != null and kart.ability.is_ready() and absf(angle) < 0.15 and _rng.randf() < 0.01:
+		_skill_hold_left = KartAbility.CHARGE_TIME + 0.1 if _rng.randf() < 0.5 else dt
+		use_ability = true
+
+	# Items: use a little while after picking one up.
+	var use_item := false
+	if kart.item.is_empty():
+		_item_wait = -1.0
+	elif _item_wait < 0.0:
+		_item_wait = _rng.randf_range(0.8, 4.0)
+	else:
+		_item_wait -= dt
+		if _item_wait <= 0.0:
+			use_item = true
+			_item_wait = _rng.randf_range(0.5, 1.5)
 
 	# Stuck against something? Back up, then respawn.
 	if kart.controls_enabled and absf(kart.speed) < 2.0:
@@ -68,5 +88,6 @@ func read(kart: Kart) -> Dictionary:
 		"steer": steer,
 		"drift": _drift_hold,
 		"ability": use_ability,
+		"item": use_item,
 		"respawn": respawn,
 	}

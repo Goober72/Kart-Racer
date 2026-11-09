@@ -9,6 +9,10 @@ var _time: Label
 var _speed: Label
 var _ability_name: Label
 var _ability_bar: ProgressBar
+var _charge_bar: ProgressBar
+var _item_box: PanelContainer
+var _item_icon: Label
+var _item_name: Label
 var _drift_bar: ProgressBar
 var _center: Label
 var _message_time: float = 0.0
@@ -63,6 +67,24 @@ func setup(race_node: Node) -> void:
 	bottom_left.add_child(_ability_name)
 	_ability_bar = UIKit.bar(Color(0.4, 1.0, 0.5))
 	bottom_left.add_child(_ability_bar)
+	_charge_bar = UIKit.bar(UIKit.ACCENT)
+	_charge_bar.visible = false
+	bottom_left.add_child(_charge_bar)
+
+	# Held item, top-left next to the position.
+	_item_box = UIKit.panel()
+	_item_box.position = Vector2(250, 18)
+	root.add_child(_item_box)
+	var item_row := HBoxContainer.new()
+	item_row.add_theme_constant_override("separation", 10)
+	_item_box.add_child(item_row)
+	_item_icon = UIKit.label("", 34)
+	_item_icon.custom_minimum_size = Vector2(56, 56)
+	_item_icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_item_icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	item_row.add_child(_item_icon)
+	_item_name = UIKit.label("", 18)
+	item_row.add_child(_item_name)
 
 	_center = UIKit.label("", 96, UIKit.ACCENT)
 	_center.set_anchors_preset(Control.PRESET_CENTER)
@@ -120,11 +142,19 @@ func _process(delta: float) -> void:
 
 	if player.ability != null:
 		var ready := player.ability.is_ready()
-		_ability_name.text = "%s  %s" % [player.ability.get_display_name(), "[E] READY" if ready else ""]
+		var hint := "  tap / hold" if ready else ""
+		_ability_name.text = "%s%s" % [player.ability.get_display_name(false), hint]
 		_ability_bar.value = player.ability.charge_ratio()
+		var charge := player.skill_charge_ratio()
+		_charge_bar.visible = charge > 0.05
+		_charge_bar.value = charge
+		if charge >= 0.999 or (charge > 0.05 and charge < 1.0):
+			_ability_name.text = "Charging %s..." % player.ability.get_display_name(true)
 	else:
 		_ability_name.text = ""
 		_ability_bar.visible = false
+
+	_update_item(player)
 
 	if race.state == "countdown":
 		_center.text = str(ceili(race.countdown))
@@ -135,6 +165,28 @@ func _process(delta: float) -> void:
 
 	if _results.visible:
 		_refresh_results()
+
+
+func _update_item(player: Kart) -> void:
+	if player.item.is_empty():
+		_item_icon.text = ""
+		_item_name.text = "No item"
+		_item_box.modulate = Color(1, 1, 1, 0.5)
+		_set_icon_color(Color(0, 0, 0, 0.3))
+		return
+	_item_box.modulate = Color.WHITE
+	_item_icon.text = str(player.item.get("label", "?"))
+	var col := str(player.item.get("color", "#ffcc33"))
+	_set_icon_color(Color.html(col) if Color.html_is_valid(col) else Color.ORANGE)
+	var uses := " x%d" % player.item_uses if player.item_uses > 1 else ""
+	_item_name.text = "%s%s\n[Q] use" % [player.item.get("name", "Item"), uses]
+
+
+func _set_icon_color(c: Color) -> void:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = c
+	sb.set_corner_radius_all(8)
+	_item_icon.add_theme_stylebox_override("normal", sb)
 
 
 func _build_results(root: Control) -> void:
