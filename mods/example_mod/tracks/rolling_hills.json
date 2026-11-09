@@ -1,0 +1,15 @@
+{
+  "id": "rolling_hills",
+  "name": "Rolling Hills",
+  "description": "Example mod track: gentle hills, a long back straight and a tight chicane.",
+  "width": 14,
+  "laps": 3,
+  "points": [
+    [0, 0, 0], [70, 3, 0], [120, 6, 10], [150, 4, 50], [140, 0, 95],
+    [100, 0, 105], [85, 2, 80], [60, 4, 95], [10, 6, 120], [-40, 3, 100], [-55, 0, 50]
+  ],
+  "boost_pads": [0.05, [0.62, 0]],
+  "ground_color": "#5fa04a",
+  "sky_top_color": "#4a8be0",
+  "tree_count": 140
+}

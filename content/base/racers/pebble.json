@@ -1,0 +1,11 @@
+{
+  "id": "pebble",
+  "name": "Pebble",
+  "description": "A careful driver with a force field for every occasion.",
+  "body_color": "#d8d8e0",
+  "accent_color": "#3ac0c0",
+  "helmet_color": "#3ac0c0",
+  "driver_color": "#f0d0b0",
+  "stats": { "max_speed": 30.5, "acceleration": 18, "handling": 2.5, "drift": 1.0 },
+  "ability": { "type": "shield", "name": "Bubble Guard", "duration": 4, "cooldown": 9 }
+}

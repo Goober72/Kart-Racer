@@ -1,0 +1,84 @@
+name: Build game
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: "4.3"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Godot
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/godot
+            ~/.local/share/godot/export_templates
+          key: godot-${{ env.GODOT_VERSION }}-stable
+
+      - name: Download Godot and export templates
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          cd ~/godot
+          base=https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable
+          wget -q $base/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip
+          unzip -q Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip
+          mv Godot_v${GODOT_VERSION}-stable_linux.x86_64 godot
+          rm Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip
+          wget -q $base/Godot_v${GODOT_VERSION}-stable_export_templates.tpz
+          unzip -q Godot_v${GODOT_VERSION}-stable_export_templates.tpz -d tpl
+          mv tpl/templates/linux_* tpl/templates/windows_* tpl/templates/version.txt \
+            ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/
+          rm -rf tpl Godot_v${GODOT_VERSION}-stable_export_templates.tpz
+
+      - name: Import project
+        run: ~/godot/godot --headless --path . --import
+
+      - name: Smoke test
+        run: timeout 600 ~/godot/godot --headless --fixed-fps 60 --path . res://tests/smoke_test.tscn
+
+      - name: Export Dev and Play builds
+        run: |
+          set -e
+          export_one() {  # preset, debug|release, output path
+            mkdir -p "$(dirname "$3")"
+            ~/godot/godot --headless --path . --export-$2 "$1" "$3"
+            test -f "$3"
+            cp -r mods "$(dirname "$3")/mods"
+            rm -f "$(dirname "$3")/mods/.gdignore"
+          }
+          export_one "Windows - Dev"  debug   build/KartRacer-Windows-Dev/KartRacer-Dev.exe
+          export_one "Windows - Play" release build/KartRacer-Windows-Play/KartRacer.exe
+          export_one "Linux - Dev"    debug   build/KartRacer-Linux-Dev/KartRacer-Dev.x86_64
+          export_one "Linux - Play"   release build/KartRacer-Linux-Play/KartRacer.x86_64
+          ls -R build
+
+      - uses: actions/upload-artifact@v4
+        with: { name: KartRacer-Windows-Play, path: build/KartRacer-Windows-Play }
+      - uses: actions/upload-artifact@v4
+        with: { name: KartRacer-Windows-Dev, path: build/KartRacer-Windows-Dev }
+      - uses: actions/upload-artifact@v4
+        with: { name: KartRacer-Linux-Play, path: build/KartRacer-Linux-Play }
+      - uses: actions/upload-artifact@v4
+        with: { name: KartRacer-Linux-Dev, path: build/KartRacer-Linux-Dev }
+
+      - name: Attach builds to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          cd build
+          for d in */; do zip -qr "${d%/}.zip" "$d"; done
+          gh release create "$GITHUB_REF_NAME" *.zip --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}

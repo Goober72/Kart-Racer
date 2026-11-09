@@ -1,0 +1,11 @@
+# Godot
+.godot/
+*.import.tmp
+export_credentials.cfg
+
+# Build output
+build/
+
+# OS junk
+.DS_Store
+Thumbs.db

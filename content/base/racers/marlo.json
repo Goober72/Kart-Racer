@@ -1,0 +1,11 @@
+{
+  "id": "marlo",
+  "name": "Marlo",
+  "description": "A retired stunt driver with the fastest kart in the garage and a stubborn steering wheel.",
+  "body_color": "#9b2fd1",
+  "accent_color": "#ffd23f",
+  "helmet_color": "#1d1d24",
+  "driver_color": "#8d5a3b",
+  "stats": { "max_speed": 34, "acceleration": 14, "handling": 1.9, "drift": 1.1 },
+  "ability": { "type": "boost", "name": "Afterburner", "duration": 1.2, "power": 1.5, "cooldown": 9 }
+}

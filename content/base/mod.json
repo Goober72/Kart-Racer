@@ -1,0 +1,7 @@
+{
+  "id": "base",
+  "name": "Base Game",
+  "version": "0.1.0",
+  "author": "Kart Racer team",
+  "description": "The racers and tracks that ship with the game."
+}

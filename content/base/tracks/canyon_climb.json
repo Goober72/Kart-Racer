@@ -1,0 +1,22 @@
+{
+  "id": "canyon_climb",
+  "name": "Canyon Climb",
+  "description": "Up the red rocks and back down again. Watch the hairpin at the top.",
+  "width": 13,
+  "laps": 3,
+  "points": [
+    [0, 0, 0], [60, 0, 0], [110, 4, -20], [140, 10, -70], [120, 16, -120],
+    [60, 18, -140], [0, 14, -120], [-30, 8, -80], [-60, 4, -40], [-40, 1, -5]
+  ],
+  "boost_pads": [[0.3, -3], [0.3, 3], 0.75],
+  "road_color": "#4a3b36",
+  "curb_color_a": "#f2c14e",
+  "curb_color_b": "#2b2b2b",
+  "wall_color": "#b5582f",
+  "ground_color": "#c47a45",
+  "tree_color": "#6b8f3a",
+  "tree_count": 50,
+  "sky_top_color": "#e07a3f",
+  "sky_horizon_color": "#ffd7a1",
+  "sun_angle": 30
+}

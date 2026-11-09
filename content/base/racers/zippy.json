@@ -1,0 +1,11 @@
+{
+  "id": "zippy",
+  "name": "Zippy",
+  "description": "Tiny, twitchy and fond of skipping corners entirely.",
+  "body_color": "#f08a24",
+  "accent_color": "#1d1d24",
+  "helmet_color": "#e8e8e8",
+  "driver_color": "#f2c38f",
+  "stats": { "max_speed": 28.5, "acceleration": 22, "handling": 2.9, "drift": 1.2 },
+  "ability": { "type": "hop", "name": "Spring Heels", "height": 13, "push": 6, "cooldown": 6 }
+}

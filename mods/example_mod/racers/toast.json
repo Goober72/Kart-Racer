@@ -1,0 +1,18 @@
+{
+  "id": "toast",
+  "name": "Toast",
+  "description": "A slice of bread who refuses to be last. The further behind, the bigger the boost.",
+  "body_color": "#d9a05b",
+  "accent_color": "#7a4a1e",
+  "helmet_color": "#fff3c4",
+  "driver_color": "#f4d9a0",
+  "stats": { "max_speed": 30, "acceleration": 18, "handling": 2.4, "drift": 1.1 },
+  "ability": {
+    "type": "script",
+    "script": "scripts/comeback_boost.gd",
+    "name": "Comeback Crunch",
+    "cooldown": 8,
+    "base_duration": 0.8,
+    "extra_per_place": 0.35
+  }
+}

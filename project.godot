@@ -1,0 +1,35 @@
+; Engine configuration file.
+; Open this folder with Godot 4.3 (Project Manager -> Import -> select this file).
+
+config_version=5
+
+[application]
+
+config/name="Kart Racer"
+config/description="An original, moddable arcade kart racer."
+config/version="0.1.0"
+run/main_scene="res://scenes/main_menu.tscn"
+config/features=PackedStringArray("4.3", "Forward Plus")
+
+[autoload]
+
+BuildInfo="*res://scripts/autoload/build_info.gd"
+ModLoader="*res://scripts/autoload/mod_loader.gd"
+GameState="*res://scripts/autoload/game_state.gd"
+DevTools="*res://scripts/dev/dev_tools.gd"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[physics]
+
+common/physics_ticks_per_second=60
+common/physics_jitter_fix=0.0
+
+[rendering]
+
+anti_aliasing/quality/msaa_3d=2

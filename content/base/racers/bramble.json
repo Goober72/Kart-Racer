@@ -1,0 +1,11 @@
+{
+  "id": "bramble",
+  "name": "Bramble",
+  "description": "A heavy-hitting gardener. Slow to start, impossible to push around.",
+  "body_color": "#3f8f3a",
+  "accent_color": "#8a5a2b",
+  "helmet_color": "#d9d24a",
+  "driver_color": "#e8b48a",
+  "stats": { "max_speed": 30, "acceleration": 13, "handling": 2.0, "drift": 0.9 },
+  "ability": { "type": "shockwave", "name": "Root Quake", "radius": 16, "slow": 0.55, "cooldown": 10 }
+}

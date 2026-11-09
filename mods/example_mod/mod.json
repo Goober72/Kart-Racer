@@ -1,0 +1,9 @@
+{
+  "id": "example_mod",
+  "name": "Example Mod",
+  "version": "1.0",
+  "author": "Kart Racer team",
+  "description": "Shows how to add a racer with a custom scripted ability, and a new track.",
+  "priority": 0,
+  "enabled": true
+}

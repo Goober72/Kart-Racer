@@ -1,0 +1,9 @@
+{
+  "id": "sandbox",
+  "name": "Sandbox",
+  "description": "An empty field for testing and recording new tracks (dev build only).",
+  "free_roam": true,
+  "dev_only": true,
+  "points": [],
+  "tree_count": 40
+}
