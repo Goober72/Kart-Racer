@@ -8,6 +8,7 @@ extends Node3D
 ## Character animations are picked automatically from what the kart is doing
 ## (idle, drive, steer_left, steer_right, boost, skill, hit, win, lose).
 ## The older single "model" field (replaces kart and driver together) still works.
+## A racer can also be 2D: "sprite": {...} (see SpriteRacer).
 
 const DEFAULT_SEAT := Vector3(0, 0.55, 0)
 
@@ -33,6 +34,7 @@ var _skill_anim_time: float = 0.0
 var _hit_anim_time: float = 0.0
 ## Animations found in the character model (shown in the racer creator).
 var found_animations: PackedStringArray = PackedStringArray()
+var sprite: SpriteRacer
 
 
 func build(racer: Dictionary) -> void:
@@ -41,8 +43,13 @@ func build(racer: Dictionary) -> void:
 	_body_root = Node3D.new()
 	_pivot.add_child(_body_root)
 
+	var sprite_cfg = racer.get("sprite", {})
+	var sprite_covers_kart: bool = sprite_cfg is Dictionary and not sprite_cfg.is_empty() \
+		and str(sprite_cfg.get("covers", "kart")) == "kart"
 	var legacy := _load_legacy_model(racer)
-	if legacy != null:
+	if sprite_covers_kart:
+		_add_sprite(racer, sprite_cfg, Vector3.ZERO)
+	elif legacy != null:
 		_body_root.add_child(legacy)
 	else:
 		var seat := DEFAULT_SEAT
@@ -69,7 +76,9 @@ func build(racer: Dictionary) -> void:
 
 		var char_cfg: Dictionary = racer.get("character_model", {})
 		var char_scene := _load_part(racer, char_cfg)
-		if char_scene != null:
+		if sprite_cfg is Dictionary and not sprite_cfg.is_empty():
+			_add_sprite(racer, sprite_cfg, seat)
+		elif char_scene != null:
 			char_scene.position += seat
 			_body_root.add_child(char_scene)
 			_setup_animations(char_scene, char_cfg.get("animations", {}))
@@ -162,6 +171,15 @@ func preview_animation(slot: String) -> void:
 	_play(slot, true)
 
 
+func _add_sprite(racer: Dictionary, cfg: Dictionary, at: Vector3) -> void:
+	sprite = SpriteRacer.new()
+	sprite.position = at
+	_body_root.add_child(sprite)
+	sprite.setup(cfg, str(racer.get("_dir", "")))
+	if not sprite.has_frames():
+		push_warning("Racer '%s' has a sprite but no images were found." % racer.get("id", "?"))
+
+
 func _setup_animations(scene: Node, overrides: Dictionary) -> void:
 	_anim = ModelLoader.find_animation_player(scene)
 	if _anim == null:
@@ -177,6 +195,8 @@ func _setup_animations(scene: Node, overrides: Dictionary) -> void:
 
 
 func _play(slot: String, restart: bool = false) -> void:
+	if sprite != null:
+		sprite.set_slot(slot)
 	if _anim == null:
 		return
 	var name: String = _anim_map.get(slot, _anim_map.get("drive", ""))
@@ -204,7 +224,7 @@ func _update_animation(kart: Kart, delta: float) -> void:
 		slot = "steer_right"
 	elif absf(kart.speed) > 1.0:
 		slot = "drive"
-	if not _anim_map.has(slot):
+	if _anim != null and not _anim_map.has(slot):
 		slot = "drive" if absf(kart.speed) > 1.0 else "idle"
 	_play(slot)
 

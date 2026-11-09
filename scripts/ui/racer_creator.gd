@@ -37,6 +37,16 @@ var _model_info: Label
 var _preview: KartVisual
 var _anim_test := 0
 var _scroll: ScrollContainer
+## 2D sprite racer settings ({} = not a sprite racer). See SpriteRacer.
+var _sprite: Dictionary = {}
+var _sprite_slot := 0
+var _sprite_assign := ""  # "" = sort by file name, else the slot to put images in
+var _sprite_imported: Array[String] = []
+var _sprite_info: Label
+var _sprite_slot_label: Label
+var _sprite_covers_button: Button
+var _popup: PanelContainer
+var _popup_text: Label
 
 var _name_edit: LineEdit
 var _desc_edit: LineEdit
@@ -177,9 +187,50 @@ func _ready() -> void:
 	_model_info.custom_minimum_size = Vector2(640, 0)
 	left.add_child(_model_info)
 
+	left.add_child(UIKit.label("2D Sprites (optional, PNG images)", 24, Color(0.75, 0.8, 0.95)))
+	var sp_row1 := HBoxContainer.new()
+	sp_row1.add_theme_constant_override("separation", 8)
+	left.add_child(sp_row1)
+	sp_row1.add_child(_caption("Auto-sort"))
+	sp_row1.add_child(UIKit.button("Pick images", func(): _pick_sprites("", false), 18))
+	sp_row1.add_child(UIKit.button("Pick folder", func(): _pick_sprites("", true), 18))
+	sp_row1.add_child(UIKit.button("Clear", _clear_sprites, 18))
+	var sp_row2 := HBoxContainer.new()
+	sp_row2.add_theme_constant_override("separation", 8)
+	left.add_child(sp_row2)
+	sp_row2.add_child(_caption("One by one"))
+	sp_row2.add_child(UIKit.button(" < ", func(): _cycle_sprite_slot(-1)))
+	_sprite_slot_label = UIKit.label("", 20)
+	_sprite_slot_label.custom_minimum_size = Vector2(150, 0)
+	_sprite_slot_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sp_row2.add_child(_sprite_slot_label)
+	sp_row2.add_child(UIKit.button(" > ", func(): _cycle_sprite_slot(1)))
+	sp_row2.add_child(UIKit.button("Add frames", func(): _pick_sprites(SpriteRacer.SLOTS[_sprite_slot], false), 18))
+	var sp_row3 := HBoxContainer.new()
+	sp_row3.add_theme_constant_override("separation", 8)
+	left.add_child(sp_row3)
+	sp_row3.add_child(_caption("Sprite"))
+	_sprite_covers_button = UIKit.button("Covers: whole kart", _toggle_sprite_covers, 18)
+	sp_row3.add_child(_sprite_covers_button)
+	sp_row3.add_child(UIKit.button("Size -", func(): _sprite_size(0.85), 18))
+	sp_row3.add_child(UIKit.button("Size +", func(): _sprite_size(1.18), 18))
+	sp_row3.add_child(UIKit.button("Smooth/Pixel", _toggle_pixel_art, 18))
+	_sprite_info = UIKit.label("", 16, Color(0.8, 0.85, 0.95))
+	_sprite_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_sprite_info.custom_minimum_size = Vector2(640, 0)
+	left.add_child(_sprite_info)
+	var tip := UIKit.label("Tip: name images like idle_1.png, drive_1.png, drive_2.png, left.png, right.png, boost.png, hit.png, win.png. Add _back / _front / _side (e.g. drive_back_1.png) for different angles.", 14, Color(0.65, 0.7, 0.8))
+	tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tip.custom_minimum_size = Vector2(640, 0)
+	left.add_child(tip)
+
 	_picker = FilePicker.new()
 	add_child(_picker)
-	_picker.picked.connect(_on_model_picked)
+	_picker.picked.connect(_on_file_picked)
+	_picker.finished.connect(_on_files_finished)
+	_picker.status.connect(func(t: String): _status.text = t)
+	_picker.cancelled.connect(func(): _status.text = "No file chosen.")
+	_build_popup()
 
 	# ---- Right: preview + actions ----
 	var right := VBoxContainer.new()
@@ -269,13 +320,28 @@ func _model_cfg(which: String) -> Dictionary:
 	return _character_model if which == "character" else _kart_model
 
 
+func _on_file_picked(file_name: String, bytes: PackedByteArray) -> void:
+	if _importing == "sprite":
+		_on_sprite_picked(file_name, bytes)
+	else:
+		_on_model_picked(file_name, bytes)
+
+
+func _on_files_finished(_count: int) -> void:
+	if _importing == "sprite":
+		_finish_sprite_import()
+
+
 func _on_model_picked(file_name: String, bytes: PackedByteArray) -> void:
+	if file_name.get_extension().to_lower() == "gltf":
+		_show_message("That's a .gltf file. Please export as .glb instead (Blender: File > Export > glTF 2.0, Format: glTF Binary). A .gltf keeps its textures in separate files, which can't be imported one at a time.")
+		return
 	if not file_name.to_lower().ends_with(".glb"):
-		_status.text = "Please pick a .glb file (in Blender: File > Export > glTF 2.0, format glTF Binary)."
+		_show_message("'%s' isn't a .glb model.\n\nIn Blender: File > Export > glTF 2.0, Format: glTF Binary (.glb)." % file_name)
 		return
 	var problem := ModelLoader.validate_bytes(bytes)
 	if problem != "":
-		_status.text = problem
+		_show_message("Couldn't import %s.\n\n%s" % [file_name, problem])
 		return
 	var base := _editing_id if _editing_id != "" else "new_%d" % Time.get_unix_time_from_system()
 	var rel := "models/%s_%s.glb" % [base, _importing]
@@ -296,6 +362,174 @@ func _on_model_picked(file_name: String, bytes: PackedByteArray) -> void:
 		cfg["seat"] = [0.0, 0.55, 0.0]
 	_status.text = "Imported %s (%d KB). Use Size/Turn until it faces away from the camera, then Save." % [file_name, bytes.size() / 1024]
 	_refresh()
+	var anims := _preview.found_animations if _preview != null else PackedStringArray()
+	_show_message("Imported %s!\n\n%s\n\nUse Size / Turn to fit it, then Save." % [file_name,
+		("Animations found: " + ", ".join(anims)) if _importing == "character" and not anims.is_empty()
+		else ("No animations found (it will still work)." if _importing == "character" else "Kart model loaded.")])
+
+
+# ---- 2D sprites ----------------------------------------------------------------
+
+func _pick_sprites(slot: String, folder: bool) -> void:
+	_importing = "sprite"
+	_sprite_assign = slot
+	_sprite_imported.clear()
+	_status.text = "Pick PNG images..." if not folder else "Pick a folder of PNG images..."
+	_picker.open(PackedStringArray(["*.png", "*.webp", "*.jpg"]), true, folder)
+
+
+func _sprite_folder_rel() -> String:
+	if not _sprite.has("folder"):
+		var base := _editing_id if _editing_id != "" else "new_%d" % Time.get_unix_time_from_system()
+		_sprite["folder"] = "sprites/" + base
+		_sprite["covers"] = "kart"
+		_sprite["height"] = 2.2
+		_sprite["fps"] = 8
+		_sprite["pixel_art"] = true
+		_sprite["frames"] = {}
+	return str(_sprite["folder"])
+
+
+func _on_sprite_picked(file_name: String, bytes: PackedByteArray) -> void:
+	var ext := file_name.get_extension().to_lower()
+	if not SpriteRacer.IMAGE_EXTS.has(ext):
+		_status.text = "Skipped %s (not a PNG/WEBP/JPG image)." % file_name
+		return
+	var img := Image.new()
+	var err := img.load_png_from_buffer(bytes) if ext == "png" else (img.load_webp_from_buffer(bytes) if ext == "webp" else img.load_jpg_from_buffer(bytes))
+	if err != OK:
+		_status.text = "Skipped %s (couldn't read the image)." % file_name
+		return
+	var dir := _mod_dir().path_join(_sprite_folder_rel())
+	DirAccess.make_dir_recursive_absolute(dir)
+	var safe := file_name.get_file().validate_filename()
+	var f := FileAccess.open(dir.path_join(safe), FileAccess.WRITE)
+	if f == null:
+		_status.text = "Couldn't store %s (%s)." % [file_name, error_string(FileAccess.get_open_error())]
+		return
+	f.store_buffer(bytes)
+	f.close()
+	_sprite_imported.append(safe)
+
+
+func _finish_sprite_import() -> void:
+	if _sprite_imported.is_empty():
+		_show_message("No images were imported. Pick PNG files (or WEBP/JPG).")
+		return
+	SpriteRacer.clear_cache()
+	var frames: Dictionary = _sprite["frames"]
+	var unsorted: Array = []
+	if _sprite_assign != "":
+		# One by one: everything goes into the chosen animation (views still read from names).
+		for file in _sprite_imported:
+			var view: String = SpriteRacer.parse_name(file)["view"]
+			_add_frame(frames, _sprite_assign, view, file)
+	else:
+		var sorted := SpriteRacer.sort_files(PackedStringArray(_sprite_imported))
+		for slot in sorted.keys():
+			for view in sorted[slot].keys():
+				for file in sorted[slot][view]:
+					if slot == "unsorted":
+						unsorted.append(file)
+					_add_frame(frames, "idle" if slot == "unsorted" else slot, view, file)
+	var msg := "Imported %d image(s)." % _sprite_imported.size()
+	if not unsorted.is_empty():
+		msg += "\n\nCouldn't tell which animation these are for, so they were added to idle: %s\n\nUse 'One by one' to put images in a specific animation, or rename them (e.g. drive_1.png)." % ", ".join(unsorted)
+	_refresh()
+	_show_message(msg + "\n\n" + _sprite_summary())
+
+
+func _add_frame(frames: Dictionary, slot: String, view: String, file: String) -> void:
+	if not frames.has(slot):
+		frames[slot] = {}
+	if not frames[slot].has(view):
+		frames[slot][view] = []
+	if not frames[slot][view].has(file):
+		frames[slot][view].append(file)
+
+
+func _sprite_summary() -> String:
+	if _sprite.is_empty():
+		return "Not a 2D racer."
+	var frames: Dictionary = _sprite.get("frames", {})
+	var parts: Array[String] = []
+	for slot in SpriteRacer.SLOTS:
+		if frames.has(slot):
+			var n := 0
+			var views: Array = []
+			for v in frames[slot].keys():
+				n += frames[slot][v].size()
+				if v != "any":
+					views.append(v)
+			parts.append("%s: %d%s" % [slot.replace("steer_", ""), n, (" (" + "/".join(views) + ")") if not views.is_empty() else ""])
+	var missing := "" if frames.has("idle") else "\nNeeds at least one idle image."
+	return "Frames - " + ", ".join(parts) + missing
+
+
+func _cycle_sprite_slot(d: int) -> void:
+	_sprite_slot = posmod(_sprite_slot + d, SpriteRacer.SLOTS.size())
+	_refresh()
+
+
+func _clear_sprites() -> void:
+	_sprite = {}
+	_refresh()
+
+
+func _toggle_sprite_covers() -> void:
+	if _sprite.is_empty():
+		_status.text = "Import some images first."
+		return
+	_sprite["covers"] = "driver" if _sprite.get("covers", "kart") == "kart" else "kart"
+	_sprite["height"] = 1.6 if _sprite["covers"] == "driver" else 2.2
+	_refresh()
+
+
+func _sprite_size(factor: float) -> void:
+	if _sprite.is_empty():
+		_status.text = "Import some images first."
+		return
+	_sprite["height"] = snappedf(clampf(float(_sprite.get("height", 2.2)) * factor, 0.3, 12.0), 0.01)
+	_refresh()
+
+
+func _toggle_pixel_art() -> void:
+	if _sprite.is_empty():
+		_status.text = "Import some images first."
+		return
+	_sprite["pixel_art"] = not _sprite.get("pixel_art", true)
+	SpriteRacer.clear_cache()
+	_refresh()
+
+
+# ---- Popup messages ------------------------------------------------------------
+
+func _build_popup() -> void:
+	_popup = UIKit.panel()
+	var solid := (_popup.get_theme_stylebox("panel") as StyleBoxFlat).duplicate() as StyleBoxFlat
+	solid.bg_color = Color(0.1, 0.12, 0.2)
+	solid.border_color = UIKit.ACCENT
+	solid.set_border_width_all(3)
+	_popup.add_theme_stylebox_override("panel", solid)
+	_popup.visible = false
+	_popup.custom_minimum_size = Vector2(620, 0)
+	add_child(_popup)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 12)
+	_popup.add_child(box)
+	_popup_text = UIKit.label("", 20)
+	_popup_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_popup_text.custom_minimum_size = Vector2(580, 0)
+	box.add_child(_popup_text)
+	box.add_child(UIKit.button("OK", func(): _popup.visible = false, 22))
+
+
+func _show_message(text: String) -> void:
+	_status.text = text.get_slice("\n", 0)
+	_popup_text.text = text
+	_popup.visible = true
+	_popup.reset_size()
+	_popup.position = (get_viewport_rect().size - _popup.size) * 0.5
 
 
 func _scale_model(which: String, factor: float) -> void:
@@ -461,6 +695,7 @@ func _new_racer() -> void:
 	_ability_level = 2
 	_character_model = {}
 	_kart_model = {}
+	_sprite = {}
 	_colors = {"body_color": KART_COLORS.pick_random(), "accent_color": "#f5f5f5",
 		"helmet_color": KART_COLORS.pick_random(), "driver_color": SKIN_COLORS.pick_random()}
 	_name_edit.text = ""
@@ -484,6 +719,9 @@ func _load_racer(r: Dictionary) -> void:
 	_ability_type = str(ab.get("type", "boost")) if ABILITIES.has(str(ab.get("type", ""))) else "boost"
 	_character_model = (r.get("character_model", {}) as Dictionary).duplicate(true)
 	_kart_model = (r.get("kart_model", {}) as Dictionary).duplicate(true)
+	_sprite = (r.get("sprite", {}) as Dictionary).duplicate(true)
+	if not _sprite.is_empty() and not _sprite.has("frames"):
+		_sprite["frames"] = SpriteRacer.sort_files(DirAccess.get_files_at(_mod_dir().path_join(str(_sprite.get("folder", "")))))
 	_ability_level = clampi(int(ab.get("level", 2)), 1, 3)
 	_ability_name_edit.text = str(ab.get("name", ""))
 	_status.text = "Editing %s." % _name_edit.text
@@ -528,6 +766,14 @@ func _refresh() -> void:
 		parts.append("Kart: %s (size %.2f, turned %d°, seat %.2f)" % [_kart_model["file"].get_file(),
 			_kart_model.get("scale", 1.0), int(_kart_model.get("rotation_y", 0)), seat.y])
 	_model_info.text = "\n".join(parts) if not parts.is_empty() else "Using the default kart and driver."
+	_sprite_slot_label.text = SpriteRacer.SLOTS[_sprite_slot].replace("steer_", "")
+	if _sprite.is_empty():
+		_sprite_info.text = "Not a 2D racer. Pick images to make one."
+	else:
+		var covers := "whole kart" if _sprite.get("covers", "kart") == "kart" else "driver only"
+		_sprite_covers_button.text = "Covers: " + covers
+		_sprite_info.text = "%s\nHeight %.2f m, %s." % [_sprite_summary(), float(_sprite.get("height", 2.2)),
+			"pixel art" if _sprite.get("pixel_art", true) else "smooth"]
 
 
 # ---- Output --------------------------------------------------------------------
@@ -558,6 +804,8 @@ func _build_data() -> Dictionary:
 		data["character_model"] = _character_model.duplicate(true)
 	if not _kart_model.is_empty():
 		data["kart_model"] = _kart_model.duplicate(true)
+	if not _sprite.is_empty() and not (_sprite.get("frames", {}) as Dictionary).is_empty():
+		data["sprite"] = _sprite.duplicate(true)
 	return data
 
 

@@ -38,6 +38,8 @@ const RACER_DEFAULTS := {
 	"character_model": {},
 	## {"file": "models/kart.glb", "scale": 1, "rotation_y": 0, "seat": [0,0.55,0], "wheels": [...], "front_wheels": [...]}
 	"kart_model": {},
+	## 2D racer from images: {"folder": "sprites/me", "covers": "kart", ...} (see SpriteRacer)
+	"sprite": {},
 }
 
 const ITEM_DEFAULTS := {
@@ -103,6 +105,7 @@ func reload() -> void:
 	items.clear()
 	Effects.clear_cache()
 	ModelLoader.clear_cache()
+	SpriteRacer.clear_cache()
 	loaded_mods.clear()
 	messages.clear()
 

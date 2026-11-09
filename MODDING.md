@@ -16,8 +16,8 @@ spread across four stats (1–5 each) and ability power (1–3), so every racer
 stays fair. **Save** adds them to the racer list, **Save + Test Drive** starts a
 quick race, and **Share file** gives you the `.json` file to send to friends.
 
-You can also **import a character model and a kart model** (.glb) here, even
-on a phone: use Size/Turn until it faces away from the camera, Seat height to
+You can also make a **2D racer from PNG images** (see below), or **import a
+character model and a kart model** (.glb) here, even on a phone: use Size/Turn until it faces away from the camera, Seat height to
 sit the character in the kart, and **Test animations** to check them.
 
 Created racers are saved as a normal mod called `my_racers` in your user mods
@@ -242,6 +242,48 @@ a JSON-only item and a scripted one.
 
 The example mod's racer **Rivet** (`mods/example_mod/racers/rivet.json`) uses an
 animated robot and a rocket kart. `tools/make_example_models.gd` shows how they're built.
+
+## 2D racers (PNG images)
+
+A racer can be drawn instead of modelled, like retro kart games. The picture
+always faces the camera.
+
+**In game:** Create a Racer → **2D Sprites**:
+- **Pick images** (or **Pick folder** on a computer): select all your images at
+  once and they're sorted into animations by their file names.
+- **One by one**: choose an animation with `<` `>`, then **Add frames** to put
+  images into it whatever they're called.
+- **Covers**: *whole kart* (your picture shows kart and driver) or *driver only*
+  (your picture sits in a 3D kart). **Size**, and **Smooth/Pixel** for
+  pixel-art vs. smooth images.
+
+**File names** (any order, any case, `-` or `_`):
+`<animation>[_<view>][_<frame number>].png`
+- animation: `idle` (the only one you need), `drive`, `left`, `right`, `boost`,
+  `skill`, `hit`, `win`, `lose`. Missing ones fall back to drive/idle.
+- view (optional): `back` (what you see behind your own kart), `front`, `side`.
+  Draw side views facing **right**; they're mirrored for the other side.
+  Without views, the same picture is used from every angle.
+- frame number: frames play in number order (`drive_1`, `drive_2`, ...).
+
+Examples: `idle.png`, `drive_1.png`, `drive_2.png`, `drive_back_1.png`,
+`left_back_1.png`, `hit_side_2.png`, `win_front_1.png`.
+
+**In a mod file:**
+```json
+"sprite": {
+  "folder": "sprites/pip",
+  "covers": "kart",
+  "height": 2.4,
+  "fps": 6,
+  "pixel_art": true
+}
+```
+Images in the folder are sorted by name, or list them yourself with
+`"frames": {"idle": {"back": ["a.png", "b.png"], "any": ["c.png"]}}`.
+See the example mod's **Pip** (`mods/example_mod/sprites/pip/`), drawn by
+`tools/make_example_sprites.gd`. PNG with transparency works best; WEBP and JPG
+also load.
 
 ## Tracks
 

@@ -50,6 +50,17 @@ func _run() -> void:
 	_check(rivet._anim_map.get("win", "") == "Cheer" and rivet._anim_map.get("steer_left", "") == "LeanLeft", "animations mapped to slots")
 	_check(rivet._model_wheels.size() == 4 and rivet._model_front.size() == 2, "kart model wheels found (4, 2 front)")
 	rivet.queue_free()
+	var pip := KartVisual.make_preview(ModLoader.racers["pip"])
+	add_child(pip)
+	_check(pip.sprite != null and pip.sprite.frames.size() >= 7, "2D sprite racer loaded (%d animations)" % (pip.sprite.frames.size() if pip.sprite else 0))
+	_check(pip.sprite != null and pip.sprite.frames.get("drive", {}).has("side"), "sprite views sorted (drive has back/front/side)")
+	pip.queue_free()
+	var p1 := SpriteRacer.parse_name("Drive_Back_02.png")
+	var p2 := SpriteRacer.parse_name("left.png")
+	var p3 := SpriteRacer.parse_name("victory3.PNG")
+	var p4 := SpriteRacer.parse_name("random.png")
+	_check(p1["slot"] == "drive" and p1["view"] == "back" and p1["number"] == 2, "sprite name: Drive_Back_02.png")
+	_check(p2["slot"] == "steer_left" and p3["slot"] == "win" and p3["number"] == 3 and p4["slot"] == "unsorted", "sprite names: left / victory3 / unsorted")
 	var auto := ModelLoader.map_animations(PackedStringArray(["Armature|Idle_Loop", "Armature|Driving", "Turn_Left", "Victory"]), {})
 	_check(auto.get("idle") == "Armature|Idle_Loop" and auto.get("drive") == "Armature|Driving" and auto.get("win") == "Victory", "animation names auto-detected")
 
@@ -71,7 +82,7 @@ func _run() -> void:
 func _race_test(track_id: String) -> void:
 	print("== Race on %s ==" % track_id)
 	GameState.track_id = track_id
-	GameState.racer_id = "rivet" if track_id == "loop_park" else "toast"
+	GameState.racer_id = {"loop_park": "rivet", "meadow_ring": "pip"}.get(track_id, "toast")
 	GameState.ai_count = 5
 	GameState.laps = 1
 	GameState.start_race()
@@ -115,10 +126,12 @@ func _race_test(track_id: String) -> void:
 	print("     race_time %.1fs, %d/%d finished" % [race.race_time, finished, race.karts.size()])
 	for k in race.karts:
 		print("     %-10s place %d  dist %.0f  %s" % [k.display_name, k.place, k.distance, ("%.1fs" % k.finish_time) if k.finished else "-"])
-	_check(used_ability, "skill tap activated (scripted, from mod)")
+	_check(used_ability, "skill tap activated")
 	_check(used_charged, "skill charged activated")
 	if GameState.racer_id == "toast":
 		_check(race.player.ability != null and race.player.ability.get_script() != KartAbility, "mod skill script compiled")
+	if GameState.racer_id == "pip":
+		_check(race.player.visual.sprite != null, "player races as a 2D sprite")
 	if track_id == "loop_park":
 		_check(race.track.points_from_model, "racing line read from model Path markers")
 		var pads: Array = race.track.find_children("*", "BoostPad", true, false)

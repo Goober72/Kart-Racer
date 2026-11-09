@@ -1,0 +1,14 @@
+{
+  "id": "pip",
+  "name": "Pip",
+  "description": "Example 2D racer made from PNG images, with back, front and side views.",
+  "stats": { "max_speed": 30, "acceleration": 19, "handling": 2.6, "drift": 1.1 },
+  "sprite": {
+    "folder": "sprites/pip",
+    "covers": "kart",
+    "height": 2.4,
+    "fps": 6,
+    "pixel_art": true
+  },
+  "ability": { "type": "hop", "level": 2, "name": "Bounce" }
+}

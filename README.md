@@ -100,7 +100,7 @@ See **[MODDING.md](MODDING.md)**. Short version: a mod is a folder in `mods/`
 with a `mod.json`, plus `racers/*.json`, `tracks/*.json` and/or `items/*.json`.
 Skills and items are built from the same effects (boost, hop, shield,
 shockwave, drop a trap, throw a projectile, zap) or your own GDScript. Racers can
-use imported character and kart models with animations; tracks can be a list of
+use imported character and kart models with animations, or be 2D from PNG images; tracks can be a list of
 points (the game builds the road) or a 3D model. The example mod shows all of it.
 
 ## Project layout
