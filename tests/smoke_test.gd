@@ -45,6 +45,7 @@ func _run() -> void:
 		await _race_test(track_id)
 
 	await _dev_test()
+	await _creator_test()
 
 	print("")
 	if failures.is_empty():
@@ -95,6 +96,26 @@ func _race_test(track_id: String) -> void:
 	_check(race.player.ability != null and not race.player.ability is BoostAbility, "mod ability script compiled")
 	_check(finished >= race.karts.size() - 1, "karts finish the lap")
 	_check(race.player.finished, "player kart finished")
+
+
+func _creator_test() -> void:
+	print("== Racer creator ==")
+	var menu = get_tree().current_scene
+	menu._open_creator()
+	await _frames(2)
+	var creator: RacerCreator = menu.find_children("*", "RacerCreator", true, false)[0]
+	creator._name_edit.text = "Smoke Tester"
+	for i in 5:
+		creator._change_stat("max_speed", 1)
+	_check(creator._points_used() <= RacerCreator.BUDGET, "creator respects points budget (%d)" % creator._points_used())
+	_check(creator._save(), "creator saves racer")
+	var id := creator._editing_id
+	_check(ModLoader.racers.has(id), "created racer '%s' loaded as a mod" % id)
+	_check(ModLoader.racers.get(id, {}).get("_mod", "") == "my_racers", "created racer is in my_racers mod")
+	creator._delete()
+	_check(not ModLoader.racers.has(id), "created racer deleted")
+	creator._close()
+	await _frames(2)
 
 
 func _dev_test() -> void:

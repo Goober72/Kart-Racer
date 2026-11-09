@@ -301,6 +301,8 @@ func _build_ground() -> void:
 
 func _build_trees() -> void:
 	var count := int(data.get("tree_count", 90))
+	if GameState.is_low_end():
+		count = count / 2
 	if count <= 0:
 		return
 	var rng := RandomNumberGenerator.new()

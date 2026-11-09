@@ -7,6 +7,7 @@ var player: Kart
 var camera: ChaseCamera
 var hud: RaceHUD
 var pause_menu: PauseMenu
+var touch_controls: TouchControls
 ## "countdown", "racing", "finished" (player done) or "free" (free roam / no laps)
 var state: String = "countdown"
 var countdown: float = 3.0
@@ -41,6 +42,10 @@ func _ready() -> void:
 
 	pause_menu = PauseMenu.new()
 	add_child(pause_menu)
+
+	if TouchControls.wanted():
+		touch_controls = TouchControls.new()
+		add_child(touch_controls)
 
 	if track.free_roam or track.length <= 0.0:
 		_start_free_roam()
@@ -113,7 +118,8 @@ func _build_track(data: Dictionary) -> void:
 		_environment = WorldEnvironment.new()
 		add_child(_environment)
 		_sun = DirectionalLight3D.new()
-		_sun.shadow_enabled = true
+		# Shadows are expensive on phones.
+		_sun.shadow_enabled = not GameState.is_low_end()
 		_sun.directional_shadow_max_distance = 160.0
 		add_child(_sun)
 	var env := Environment.new()
@@ -252,6 +258,8 @@ func _on_player_finished() -> void:
 	player.controller = AIController.new(track, 0.8, 4242)
 	hud.flash_message("FINISH!", 2.0)
 	hud.show_results()
+	if touch_controls != null:
+		touch_controls.set_shown(false)
 
 
 func _color(data: Dictionary, key: String, fallback: Color) -> Color:

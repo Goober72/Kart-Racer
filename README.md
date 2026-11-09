@@ -20,11 +20,33 @@ The same project exports two versions of the game:
 | Hot reload of mods (F9) | Yes | No |
 | Mod errors shown on screen | Yes, with file and line | Problem list in the Mods menu |
 | Sandbox test track | Yes | Hidden |
+| Create a Racer screen | Yes | No (but racers made in Dev show up) |
 | Exported as | Debug (console window shows logs) | Release (faster) |
 
 Running the project from the Godot editor always behaves like the Dev build.
 To try the Play build from the editor, add `--play` under
 *Project → Project Settings → Editor → Run → Main Run Args* (or launch with `godot -- --play`).
+
+## Play in a browser / on your phone
+
+The Dev build also exports to the web, with on-screen touch controls for phones
+and tablets (turn the phone sideways). Once GitHub Pages is switched on for this
+repo it's published automatically on every push to `main` at:
+
+**https://goober72.github.io/Kart-Racer/**
+
+To switch it on: make the repo public (Settings → General → Danger Zone → Change
+visibility; Pages on private repos needs a paid GitHub plan), then go to
+Settings → Pages → Source: **GitHub Actions**, then re-run the latest
+**Build game** workflow. You can also download the `KartRacer-Web-Dev` artifact
+and host the folder anywhere (itch.io works: upload it as an HTML game).
+
+Notes for the browser version:
+- Touch controls: `<` `>` steer, **GO**, **BRAKE**, **DRIFT** (hold while turning), **POWER** (ability), **R** respawn, **II** pause.
+- The **DEV** button at the top replaces the F-keys (console, debug info, free cam, track recorder, reload).
+- Racers you make with **Create a Racer** and tracks you record are saved in the browser's storage.
+  Use **Share file** in the creator to download your racer's `.json` file.
+- It's a ~35 MB download the first time. Works best in Chrome or Safari on a recent phone.
 
 ## Getting the game
 

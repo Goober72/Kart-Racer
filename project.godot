@@ -10,6 +10,7 @@ config/description="An original, moddable arcade kart racer."
 config/version="0.1.0"
 run/main_scene="res://scenes/main_menu.tscn"
 config/features=PackedStringArray("4.3", "Forward Plus")
+config/icon="res://icon.svg"
 
 [autoload]
 
@@ -24,6 +25,11 @@ window/size/viewport_width=1280
 window/size/viewport_height=720
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
+window/handheld/orientation=4
+
+[input_devices]
+
+pointing/emulate_mouse_from_touch=true
 
 [physics]
 
@@ -31,5 +37,8 @@ common/physics_ticks_per_second=60
 common/physics_jitter_fix=0.0
 
 [rendering]
+
+renderer/rendering_method.mobile="gl_compatibility"
+renderer/rendering_method.web="gl_compatibility"
 
 anti_aliasing/quality/msaa_3d=2

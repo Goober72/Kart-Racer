@@ -8,7 +8,9 @@ extends Node
 ## Where mods are looked for:
 ##   - Running in the Godot editor:  <project folder>/mods/
 ##   - Exported game:                <folder with the .exe>/mods/
-##   - Always:                       user://mods/  (the per-user data folder)
+##   - Browser version:              mods bundled into the game (read-only)
+##   - Always:                       user://mods/  (the per-user data folder;
+##                                   in a browser it's saved in browser storage)
 ## Each mod is a folder containing a mod.json file. See MODDING.md.
 
 signal reloaded
@@ -126,16 +128,27 @@ func reload() -> void:
 ## Folders that are scanned for mods.
 func get_mod_roots() -> PackedStringArray:
 	var roots := PackedStringArray()
-	if OS.has_feature("editor"):
+	if OS.has_feature("web"):
+		roots.append("res://mods")
+	elif OS.has_feature("editor"):
 		roots.append(ProjectSettings.globalize_path("res://mods"))
 	else:
 		roots.append(OS.get_executable_path().get_base_dir().path_join("mods"))
-	roots.append(ProjectSettings.globalize_path("user://mods"))
+	roots.append(user_mods_dir())
 	return roots
+
+
+## The per-user mods folder (also where the character creator saves).
+func user_mods_dir() -> String:
+	if OS.has_feature("web"):
+		return "user://mods"
+	return ProjectSettings.globalize_path("user://mods")
 
 
 ## The mods folder that tools (like the track recorder) save into.
 func get_writable_mod_root() -> String:
+	if OS.has_feature("web"):
+		return user_mods_dir()
 	return get_mod_roots()[0]
 
 

@@ -39,7 +39,7 @@ jobs:
           rm Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip
           wget -q $base/Godot_v${GODOT_VERSION}-stable_export_templates.tpz
           unzip -q Godot_v${GODOT_VERSION}-stable_export_templates.tpz -d tpl
-          mv tpl/templates/linux_* tpl/templates/windows_* tpl/templates/version.txt \
+          mv tpl/templates/linux_* tpl/templates/windows_* tpl/templates/web_* tpl/templates/version.txt \
             ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/
           rm -rf tpl Godot_v${GODOT_VERSION}-stable_export_templates.tpz
 
@@ -63,6 +63,11 @@ jobs:
           export_one "Windows - Play" release build/KartRacer-Windows-Play/KartRacer.exe
           export_one "Linux - Dev"    debug   build/KartRacer-Linux-Dev/KartRacer-Dev.x86_64
           export_one "Linux - Play"   release build/KartRacer-Linux-Play/KartRacer.x86_64
+          # Browser version (Dev build, works on phones). Mods are bundled inside it.
+          mkdir -p build/web
+          ~/godot/godot --headless --path . --export-release "Web - Dev" build/web/index.html
+          test -f build/web/index.wasm
+          touch build/web/.nojekyll
           ls -R build
 
       - uses: actions/upload-artifact@v4
@@ -74,11 +79,38 @@ jobs:
       - uses: actions/upload-artifact@v4
         with: { name: KartRacer-Linux-Dev, path: build/KartRacer-Linux-Dev }
 
+      - uses: actions/upload-artifact@v4
+        with: { name: KartRacer-Web-Dev, path: build/web }
+
+      - name: Prepare browser version for GitHub Pages
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
       - name: Attach builds to release
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           cd build
-          for d in */; do zip -qr "${d%/}.zip" "$d"; done
+          for d in KartRacer-*/; do zip -qr "${d%/}.zip" "$d"; done
           gh release create "$GITHUB_REF_NAME" *.zip --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}
+
+  # Publishes the browser version at https://<user>.github.io/<repo>/
+  # Needs GitHub Pages turned on: Settings -> Pages -> Source: "GitHub Actions".
+  # (Pages on private repos needs a paid GitHub plan, so the repo must be public on a free plan.)
+  deploy-web:
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

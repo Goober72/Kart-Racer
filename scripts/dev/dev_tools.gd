@@ -6,6 +6,7 @@ extends CanvasLayer
 ##   F5       - track recorder: add a point at your kart / free camera
 ##   F6       - toggle free camera (WASD/arrows move, Q/E down/up, Shift fast)
 ##   F9       - reload mods and restart the race
+## On touchscreens a "DEV" button gives the same tools without a keyboard.
 
 var race: Node = null
 
@@ -13,6 +14,7 @@ var _console: PanelContainer
 var _log: RichTextLabel
 var _line: LineEdit
 var _overlay: Label
+var _touch_panel: Control
 var _commands: Dictionary = {}
 var _history: Array[String] = []
 var _history_pos: int = 0
@@ -110,6 +112,50 @@ func _build_ui() -> void:
 	_overlay.position = Vector2(10, 360)
 	_overlay.visible = false
 	add_child(_overlay)
+
+	if TouchControls.wanted():
+		_build_touch_toolbar()
+
+
+## Buttons for phones/tablets, where there are no F-keys.
+func _build_touch_toolbar() -> void:
+	var toggle := UIKit.button("DEV", func(): _touch_panel.visible = not _touch_panel.visible, 20)
+	toggle.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	toggle.position = Vector2(-50, 30)
+	toggle.custom_minimum_size = Vector2(100, 50)
+	toggle.modulate = Color(1, 0.7, 0.7, 0.85)
+	add_child(toggle)
+
+	var panel := UIKit.panel()
+	panel.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	panel.position = Vector2(-330, 90)
+	panel.visible = false
+	add_child(panel)
+	_touch_panel = panel
+	var grid := GridContainer.new()
+	grid.columns = 4
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 8)
+	panel.add_child(grid)
+	var entries := [
+		["Console", func(): _toggle_console()],
+		["Info", func(): _overlay.visible = not _overlay.visible],
+		["Free cam", func(): _run("freecam")],
+		["Reload", func(): _run("reload")],
+		["Sandbox", func(): _run("sandbox")],
+		["New track", func(): _run("track_new my_track")],
+		["+ Point", func(): _run("track_point")],
+		["Undo point", func(): _run("track_undo")],
+		["Preview", func(): _run("track_preview")],
+		["Save track", func(): _run("track_save")],
+		["Boost", func(): _run("boost")],
+		["Menu", func(): _touch_panel.visible = false; _run("menu")],
+	]
+	for e in entries:
+		var b := UIKit.button(e[0], e[1], 18)
+		b.custom_minimum_size = Vector2(150, 52)
+		b.focus_mode = Control.FOCUS_NONE
+		grid.add_child(b)
 
 
 func _toggle_console() -> void:
@@ -321,23 +367,18 @@ func _cmd_freecam(_args: Array) -> void:
 		_freecam.current = true
 		_freecam_on = true
 		race.player.controls_enabled = false
-		_print("Free camera on: WASD/arrows move, Q/E down/up, Shift = fast, F5 drops a track point, F6 exits."))
+		_print("Free camera on: WASD/arrows (or GO/BRAKE/steer buttons) move, Q/E or DRIFT/POWER down/up, Shift = fast, F5 or '+ Point' drops a track point, F6 exits."))
 
 
 func _move_freecam(delta: float) -> void:
+	# Uses the normal driving controls so touch buttons and gamepads work too:
+	# accelerate/brake = forward/back, steer = turn, ability = up, drift = down.
 	var dir := Vector3.ZERO
-	if Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP):
-		dir.z -= 1
-	if Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN):
-		dir.z += 1
-	var turn := 0.0
-	if Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT):
-		turn += 1
-	if Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT):
-		turn -= 1
-	if Input.is_physical_key_pressed(KEY_E):
+	dir.z = Input.get_action_strength("brake") - Input.get_action_strength("accelerate")
+	var turn := Input.get_action_strength("steer_left") - Input.get_action_strength("steer_right")
+	if Input.is_physical_key_pressed(KEY_E) or Input.is_action_pressed("ability"):
 		dir.y += 1
-	if Input.is_physical_key_pressed(KEY_Q):
+	if Input.is_physical_key_pressed(KEY_Q) or (Input.is_action_pressed("drift") and not Input.is_physical_key_pressed(KEY_SHIFT)):
 		dir.y -= 1
 	var spd := 60.0 if Input.is_physical_key_pressed(KEY_SHIFT) else 20.0
 	var real_delta := delta / maxf(Engine.time_scale, 0.01)

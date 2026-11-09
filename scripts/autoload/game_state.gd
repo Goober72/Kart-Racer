@@ -18,9 +18,54 @@ func _init() -> void:
 	_setup_controls()
 
 
+var _rotate_notice: CanvasLayer
+
+
 func _ready() -> void:
 	ModLoader.reloaded.connect(validate_selection)
 	validate_selection()
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	if is_low_end():
+		ProjectSettings.set_setting("rendering/anti_aliasing/quality/msaa_3d", 0)
+		get_viewport().msaa_3d = Viewport.MSAA_DISABLED
+	_build_rotate_notice()
+
+
+## Phones, tablets and the browser version get lighter graphics.
+func is_low_end() -> bool:
+	return OS.has_feature("mobile") or OS.has_feature("web_android") or OS.has_feature("web_ios") \
+		or (OS.has_feature("web") and DisplayServer.is_touchscreen_available())
+
+
+func _process(_delta: float) -> void:
+	# On phones held upright, ask the player to turn the phone sideways.
+	if _rotate_notice != null:
+		var size := get_viewport().get_visible_rect().size
+		_rotate_notice.visible = TouchControls.wanted() and size.y > size.x * 1.05
+
+
+func _build_rotate_notice() -> void:
+	_rotate_notice = CanvasLayer.new()
+	_rotate_notice.layer = 200
+	_rotate_notice.visible = false
+	add_child(_rotate_notice)
+	var bg := ColorRect.new()
+	bg.color = Color(0.05, 0.06, 0.1)
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_rotate_notice.add_child(bg)
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.add_child(center)
+	var l := UIKit.label("Turn your phone sideways\nto play", 56, UIKit.ACCENT)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	center.add_child(l)
+
+
+func toggle_fullscreen() -> void:
+	if DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+	else:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
 
 
 ## Makes sure the selected racer/track still exist (mods may have been removed).

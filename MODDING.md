@@ -5,6 +5,18 @@ have **scripted abilities** written in GDScript. Use the **Dev build** while
 making mods: it shows errors with file names and line numbers, and you can
 reload mods without restarting (F9 or the `reload` command).
 
+## The quickest way: Create a Racer
+
+In the Dev build (including the browser version) press **Create a Racer** on the
+main menu. Pick a name, colors, stats and an ability. You get **15 points** to
+spread across four stats (1–5 each) and ability power (1–3), so every racer
+stays fair. **Save** adds them to the racer list, **Save + Test Drive** starts a
+quick race, and **Share file** gives you the `.json` file to send to friends.
+
+Created racers are saved as a normal mod called `my_racers` in your user mods
+folder (see below), so you can open the file and keep editing it by hand. For
+example, you can add a custom `model` or a scripted ability.
+
 ## Where mods go
 
 | Running... | Mods folder |
@@ -12,6 +24,7 @@ reload mods without restarting (F9 or the `reload` command).
 | From the Godot editor | `<project>/mods/` |
 | An exported build | `mods/` next to the `.exe` |
 | Either (per-user) | `user://mods/`: on Windows `%APPDATA%\Godot\app_userdata\Kart Racer\mods` |
+| Browser version | Mods in the repo's `mods/` folder are built in; your own creations live in browser storage |
 
 The in-game **Mods** button lists the exact folders and any problems.
 

@@ -37,6 +37,13 @@ static func clear_cache() -> void:
 
 static func _from_script(path: String) -> KartAbility:
 	var script: GDScript = _script_cache.get(path)
+	if script == null and path.begins_with("res://"):
+		# Mods bundled inside the game (browser version) are already compiled.
+		script = load(path) as GDScript
+		if script == null:
+			push_warning("Ability script not found: " + path)
+			return null
+		_script_cache[path] = script
 	if script == null:
 		if not FileAccess.file_exists(path):
 			push_warning("Ability script not found: " + path)

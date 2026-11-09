@@ -60,6 +60,8 @@ func _ready() -> void:
 	left.add_child(spacer)
 	var start := UIKit.button("RACE!", _start, 30)
 	left.add_child(start)
+	if BuildInfo.is_dev:
+		left.add_child(UIKit.button("Create a Racer", _open_creator, 24))
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
 	left.add_child(row)
@@ -70,11 +72,16 @@ func _ready() -> void:
 		var reload := UIKit.button("Reload Mods", _reload_mods)
 		reload.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(reload)
-	var quit := UIKit.button("Quit", func(): get_tree().quit())
-	quit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(quit)
+	if OS.has_feature("web"):
+		var fs := UIKit.button("Fullscreen", func(): GameState.toggle_fullscreen())
+		fs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(fs)
+	else:
+		var quit := UIKit.button("Quit", func(): get_tree().quit())
+		quit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(quit)
 
-	var help := "Controls: W/S or Up/Down drive  -  A/D steer  -  Space/Shift drift  -  E ability  -  R respawn  -  Esc pause"
+	var help := "Touch: GO / BRAKE / < > to steer / DRIFT / POWER buttons on screen." if TouchControls.wanted() else "Controls: W/S or Up/Down drive  -  A/D steer  -  Space/Shift drift  -  E ability  -  R respawn  -  Esc pause"
 	var help_label := UIKit.label(help, 14, Color(0.7, 0.75, 0.85))
 	help_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	left.add_child(help_label)
@@ -232,6 +239,12 @@ func _start() -> void:
 		return
 	GameState.track_override = {}
 	GameState.start_race()
+
+
+func _open_creator() -> void:
+	var creator := RacerCreator.new()
+	add_child(creator)
+	creator.closed.connect(_refresh_lists)
 
 
 func _reload_mods() -> void:
