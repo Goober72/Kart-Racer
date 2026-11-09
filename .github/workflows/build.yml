@@ -25,7 +25,7 @@ jobs:
           path: |
             ~/godot
             ~/.local/share/godot/export_templates
-          key: godot-${{ env.GODOT_VERSION }}-stable
+          key: godot-${{ env.GODOT_VERSION }}-stable-with-web
 
       - name: Download Godot and export templates
         if: steps.cache-godot.outputs.cache-hit != 'true'
